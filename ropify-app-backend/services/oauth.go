@@ -44,13 +44,7 @@ func (s *OAuthService) HandleGoogleLogin(ctx context.Context, code string) (stri
 			GoogleID:  &userInfo.ID,
 		}
 
-		user, err = s.repository.RegisterUser(ctx, &models.AuthCredentials{
-			Email:     newUser.Email,
-			FirstName: newUser.FirstName,
-			LastName:  newUser.LastName,
-			Username:  newUser.Username,
-			// Generar contraseña aleatoria o dejar en blanco
-		})
+		user, err = s.repository.RegisterOAuthUser(ctx, newUser)
 
 		if err != nil {
 			return "", nil, err

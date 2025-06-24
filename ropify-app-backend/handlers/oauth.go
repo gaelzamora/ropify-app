@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/gaelzamora/ropify-app/config"
@@ -16,18 +19,43 @@ type OAuthHandler struct {
 
 // Inicia el flujo de autenticación de Google
 func (h *OAuthHandler) GoogleLogin(ctx *fiber.Ctx) error {
-	url := config.GoogleOAuthConfig.AuthCodeURL("state", oauth2.AccessTypeOffline)
+	// Obtener la URI de redirección si se proporciona (para apps móviles)
+	redirectUri := ctx.Query("redirect_uri", "")
+
+	// Crear un estado con la URI de redirección codificada
+	state := "default_state"
+	if redirectUri != "" {
+		stateData := map[string]string{"redirect_uri": redirectUri}
+		stateBytes, _ := json.Marshal(stateData)
+		state = base64.StdEncoding.EncodeToString(stateBytes)
+	}
+
+	url := config.GoogleOAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	return ctx.Redirect(url)
 }
 
 // Maneja la redirección de Google después de la autenticación
 func (h *OAuthHandler) GoogleCallback(ctx *fiber.Ctx) error {
 	code := ctx.Query("code")
+	stateParam := ctx.Query("state")
+
 	if code == "" {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
 			"message": "No code provided",
 		})
+	}
+
+	// Procesar estado y extraer redirect_uri si existe
+	var redirectUri string
+	if stateParam != "default_state" {
+		stateBytes, err := base64.StdEncoding.DecodeString(stateParam)
+		if err == nil {
+			var stateData map[string]string
+			if json.Unmarshal(stateBytes, &stateData) == nil {
+				redirectUri = stateData["redirect_uri"]
+			}
+		}
 	}
 
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -41,6 +69,26 @@ func (h *OAuthHandler) GoogleCallback(ctx *fiber.Ctx) error {
 		})
 	}
 
+	// Si hay una URI de redirección móvil, redirigir ahí con los datos
+	if redirectUri != "" {
+		responseData := map[string]interface{}{
+			"token":   token,
+			"user_id": user.ID,
+		}
+		jsonData, _ := json.Marshal(responseData)
+		encodedData := base64.URLEncoding.EncodeToString(jsonData)
+
+		redirectTo := redirectUri
+		if strings.Contains(redirectUri, "?") {
+			redirectTo += "&data=" + encodedData
+		} else {
+			redirectTo += "?data=" + encodedData
+		}
+
+		return ctx.Redirect(redirectTo)
+	}
+
+	// Respuesta JSON normal para clientes web
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"status":  "success",
 		"message": "Successfully authenticated with Google",

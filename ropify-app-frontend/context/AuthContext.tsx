@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useState } from "react";
 import { User } from "@/types/user";
 import { router } from "expo-router";
+import { oauthService } from "@/services/oauth";
 
 interface AuthContextProps {
     isLoggedIn: boolean;
@@ -10,6 +11,8 @@ interface AuthContextProps {
     authenticate: (authMode: "login" | "register", email: string, password: string, username?: string, firstName?: string, lastName?: string) => Promise<void>
     logout: VoidFunction;
     user: User | null;
+    authenticateWithGoogle: () => Promise<void>;
+    
 }
 
 const AuthContext = React.createContext({} as AuthContextProps);
@@ -86,6 +89,24 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
         }
     }
 
+    async function authenticateWithGoogle() {
+        try {
+            setIsLoadingAuth(true);
+            const response = await oauthService.googleLogin();
+            
+            setIsLoggedIn(true);
+            await AsyncStorage.setItem("token", response.data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+            setUser(response.data.user);
+            router.replace("/(authed)/(tabs)/settings" as any);
+        } catch (error) {
+            console.error("Google authentication failed:", error);
+            // Mostrar un toast o alerta al usuario
+        } finally {
+            setIsLoadingAuth(false);
+        }
+    }
+
     async function logout() {
         setIsLoggedIn(false)
         await AsyncStorage.removeItem("token")
@@ -100,6 +121,9 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
                 isLoggedIn,
                 isLoadingAuth,
                 user,
+                authenticateWithGoogle,
+                setIsLoggedIn,
+                setUser
             } }>
                 { children }
         </AuthContext.Provider>

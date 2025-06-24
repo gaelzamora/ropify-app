@@ -18,6 +18,7 @@ type AuthCredentials struct {
 type AuthRepository interface {
 	RegisterUser(ctx context.Context, registerData *AuthCredentials) (*User, error)
 	GetUser(ctx context.Context, query interface{}, args ...interface{}) (*User, error)
+	RegisterOAuthUser(ctx context.Context, user *User) (*User, error)
 }
 
 type AuthService interface {

@@ -29,6 +29,13 @@ func (r *AuthRepository) RegisterUser(ctx context.Context, registerData *models.
 	return user, nil
 }
 
+func (r *AuthRepository) RegisterOAuthUser(ctx context.Context, user *models.User) (*models.User, error) {
+	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
+		return nil, err	
+	}
+	return user, nil
+}
+
 func (r *AuthRepository) GetUser(ctx context.Context, query interface{}, args ...interface{}) (*models.User, error) {
 	user := &models.User{}
 

@@ -11,5 +11,6 @@ export type User = {
     email: string;
     avatar_url?: string;
     bio?: string;
+    google_id?: string
     created_at: string;
 };

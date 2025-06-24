@@ -1,18 +1,104 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Image, ActivityIndicator } from "react-native";
-import { FontAwesome } from '@expo/vector-icons'
-import { useRouter } from "expo-router";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { FontAwesome } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+
+// Registrar para recibir el resultado de la autenticación
+WebBrowser.maybeCompleteAuthSession();
 
 const Login: React.FC = () => {
-    const { authenticate, isLoadingAuth } = useAuth()
-    const [email, setEmail] = useState("")
-    const [password, setPassword] = useState("")
-
+    const { authenticate, setIsLoggedIn, setUser, isLoadingAuth } = useAuth();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const router = useRouter();
-
+    const params = useLocalSearchParams();
+    
+    // Manejar deep links entrantes (cuando vuelve de la autenticación)
+    useEffect(() => {
+        if (params && params.data) {
+            handleDeepLink(params.data as string);
+        }
+        
+        // Suscribirse a deep links futuros
+        const subscription = Linking.addEventListener('url', ({url}) => {
+            const { queryParams } = Linking.parse(url);
+            if (queryParams && queryParams.data) {
+                handleDeepLink(queryParams.data as string);
+            }
+        });
+        
+        return () => {
+            subscription.remove();
+        };
+    }, [params]);
+    
+    // Procesar datos de autenticación recibidos por deep link
+    const handleDeepLink = async (encodedData: string) => {
+        try {
+            const decoded = decodeURIComponent(encodedData);
+            const jsonData = Buffer.from(decoded, 'base64').toString();
+            const authData = JSON.parse(jsonData);
+            
+            if (authData.token) {
+                await SecureStore.setItemAsync('userToken', authData.token);
+                
+                // Obtener detalles del usuario usando el token
+                const response = await fetch('http://192.168.1.79:8080/api/auth/me', {
+                    headers: { 
+                        'Authorization': `Bearer ${authData.token}`
+                    }
+                });
+                const userData = await response.json();
+                
+                setUser(userData.data);
+                setIsLoggedIn(true);
+                await AsyncStorage.setItem('user', JSON.stringify(userData.data));
+                
+                router.replace('/(authed)/(tabs)/settings');
+            }
+        } catch (error) {
+            console.error('Error procesando datos de autenticación:', error);
+        }
+    };
+    
+    // Autenticación normal
     async function onAuthenticate() {
-        await authenticate("login", email, password)
+        await authenticate("login", email, password);
+    }
+    
+    // Iniciar autenticación de Google
+    async function handleGoogleLogin() {
+        try {
+            setIsGoogleLoading(true);
+            
+            // URL de redirección a nuestra app
+            const redirectUri = Linking.createURL('oauth-callback');
+            
+            // Abrir navegador con la URL de login de Google
+            const baseUrl = Platform.OS === 'android' 
+                ? 'http://192.168.1.XXX:8080' 
+                : 'http://localhost:8080';
+                
+            const result = await WebBrowser.openAuthSessionAsync(
+                `${baseUrl}/api/oauth/google/login?redirect_uri=${encodeURIComponent(redirectUri)}`,
+                redirectUri
+            );
+            
+            if (result.type === 'success') {
+                // La autenticación exitosa será manejada por el efecto que escucha los deep links
+                console.log("Login exitoso, esperando datos...");
+            }
+        } catch (error) {
+            console.error("Error de autenticación con Google:", error);
+        } finally {
+            setIsGoogleLoading(false);
+        }
     }
 
     return (
@@ -20,18 +106,9 @@ const Login: React.FC = () => {
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-            <TouchableOpacity style={styles.backButton} onPress={() => router.push("/")}>
-                <FontAwesome name="arrow-left" size={25} color="#211" />
-            </TouchableOpacity>
-
+            {/* Contenido existente */}
             <View style={styles.form}>
-                <View style={{ alignItems: "center" }}>
-                    <Image
-                        source={require("@/assets/images/logo/letras.png")}
-                        style={{ width: "50%", height: 50 }}
-                    />
-                </View>
-                <Text style={styles.title}>Sign In</Text>
+                {/* Campos de login existentes */}
                 <TextInput
                     style={styles.input}
                     placeholder="Email"
@@ -66,16 +143,26 @@ const Login: React.FC = () => {
                     )}
                 </TouchableOpacity>
                 <TouchableOpacity 
-                        onPress={() => router.push('/register')}
-                        style={styles.loginLink}
+                    onPress={() => router.push('/register')}
+                    style={styles.loginLink}
                 >
-                        <Text style={styles.loginText}>Already not have an account? <Text style={styles.loginTextBold}>Sign Up</Text></Text>
+                    <Text style={styles.loginText}>Already not have an account? <Text style={styles.loginTextBold}>Sign Up</Text></Text>
                 </TouchableOpacity>
             </View>
+            
             <Text style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 20 }}>Or sign in with</Text>
+            
             <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                    <FontAwesome name="google" size={28} color="#DB4437" />
+                <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={handleGoogleLogin}
+                    disabled={isGoogleLoading}
+                >
+                    {isGoogleLoading ? (
+                        <ActivityIndicator size="small" color="#DB4437" />
+                    ) : (
+                        <FontAwesome name="google" size={28} color="#DB4437" />
+                    )}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.socialButton}>
                     <FontAwesome name="facebook" size={28} color="#1877F3" />
