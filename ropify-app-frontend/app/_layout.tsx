@@ -1,11 +1,14 @@
+import { AuthenticationProvider } from "@/context/AuthContext";
 import { Slot } from "expo-router";
-import { StatusBar } from "react-native";
+import { StatusBar, View } from "react-native";
 
 export default function Root() {
   return (
     <>
       <StatusBar />
-      <Slot />
+      <AuthenticationProvider>
+        <Slot />
+      </AuthenticationProvider>
     </>
   )
 }

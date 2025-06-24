@@ -8,8 +8,11 @@ import (
 )
 
 type AuthCredentials struct {
-	Email    string `json:"email" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Email     string `json:"email" validate:"required"`
+	Username  string `json:"username" gorm:"unique;not null"`
+	Password  string `json:"password" validate:"required"`
 }
 
 type AuthRepository interface {

@@ -29,11 +29,13 @@ func main() {
 
 	// Service
 	authService := services.NewAuthService(authRepository)
+	oauthService := services.NewOAuthService(authRepository)
 
 	server := app.Group("/api")
 
 	// Auth handler's
 	handlers.NewAuthHandler(server.Group("/auth"), authService)
+	handlers.NewOAuthHandler(server.Group("/oauth"), oauthService)
 
 	// Private route to verify if user is authenticated
 	privateRoutes := server.Use(middlewares.AuthProtected(db))

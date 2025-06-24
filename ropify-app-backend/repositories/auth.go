@@ -13,8 +13,11 @@ type AuthRepository struct {
 
 func (r *AuthRepository) RegisterUser(ctx context.Context, registerData *models.AuthCredentials) (*models.User, error) {
 	user := &models.User{
-		Email:    registerData.Email,
-		Password: registerData.Password,
+		FirstName: registerData.FirstName,
+		LastName:  registerData.LastName,
+		Email:     registerData.Email,
+		Username:  registerData.Username,
+		Password:  registerData.Password,
 	}
 
 	res := r.db.Model(&models.User{}).Create(user)
