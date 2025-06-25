@@ -10,6 +10,8 @@ import * as SecureStore from 'expo-secure-store';
 import * as Google from 'expo-auth-session/providers/google'
 import { Image } from "react-native";
 
+require('dotenv').config()
+
 // Registrar para recibir el resultado de la autenticación
 WebBrowser.maybeCompleteAuthSession();
 
@@ -40,8 +42,8 @@ const Login: React.FC = () => {
     const router = useRouter();
 
     const [request, response, promptAsync] = Google.useAuthRequest({
-        iosClientId: '581346763419-1v79br463i6ufa9mks5jd1kasj74nkr3.apps.googleusercontent.com',
-        webClientId: '581346763419-0b4visk3isdvfsrvtqal75qpsdmug0ie.apps.googleusercontent.com',
+        iosClientId: process.env.CLIENT_IOS_ID,
+        webClientId: process.env.CLIENT_WEB_ID,
         scopes: ['profile', 'email'],
         redirectUri: 'https://auth.expo.io/@gaelzamora/ropify-app-frontend',
         usePKCE: false
