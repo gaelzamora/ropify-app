@@ -12,7 +12,8 @@ interface AuthContextProps {
     logout: VoidFunction;
     user: User | null;
     authenticateWithGoogle: () => Promise<void>;
-    
+    setIsLoggedIn: (state: boolean) => void;
+    setUser: (user: User) => void
 }
 
 const AuthContext = React.createContext({} as AuthContextProps);

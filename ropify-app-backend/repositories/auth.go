@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/gaelzamora/ropify-app/models"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -30,10 +32,31 @@ func (r *AuthRepository) RegisterUser(ctx context.Context, registerData *models.
 }
 
 func (r *AuthRepository) RegisterOAuthUser(ctx context.Context, user *models.User) (*models.User, error) {
-	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
-		return nil, err	
-	}
-	return user, nil
+	randomPass := uuid.NewString()
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(randomPass), bcrypt.DefaultCost)
+    if err != nil {
+        return nil, err
+    }
+    
+    user.Password = string(hashedPassword)
+    
+    // Usar una transacción para garantizar la consistencia
+    tx := r.db.WithContext(ctx).Begin()
+    if tx.Error != nil {
+        return nil, tx.Error
+    }
+    
+    if err := tx.Create(user).Error; err != nil {
+        tx.Rollback()
+        return nil, err
+    }
+    
+    if err := tx.Commit().Error; err != nil {
+        tx.Rollback()
+        return nil, err
+    }
+    
+    return user, nil
 }
 
 func (r *AuthRepository) GetUser(ctx context.Context, query interface{}, args ...interface{}) (*models.User, error) {
@@ -44,6 +67,10 @@ func (r *AuthRepository) GetUser(ctx context.Context, query interface{}, args ..
 	}
 
 	return user, nil
+}
+
+func (r *AuthRepository) UpdateUser(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Save(user).Error
 }
 
 func NewAuthRepository(db *gorm.DB) models.AuthRepository {

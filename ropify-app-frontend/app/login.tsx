@@ -7,106 +7,133 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Google from 'expo-auth-session/providers/google'
+import { Image } from "react-native";
 
 // Registrar para recibir el resultado de la autenticación
 WebBrowser.maybeCompleteAuthSession();
+
+if (typeof window !== "undefined") {
+  window.onload = () => {
+    if (window.location.hash.includes("access_token")) {
+      console.log("YA ENTRE (onload)");
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = params.get("access_token");
+      if (accessToken) {
+        // Puedes usar un evento personalizado o guardar el token en localStorage
+        window.localStorage.setItem("google_access_token", accessToken);
+        // Limpia el hash
+        window.location.hash = "";
+        // Opcional: recarga la app o navega a la ruta deseada
+        window.location.reload();
+      }
+    }
+  };
+}
 
 const Login: React.FC = () => {
     const { authenticate, setIsLoggedIn, setUser, isLoadingAuth } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const [manualToken, setManualToken] = useState("")
     const router = useRouter();
-    const params = useLocalSearchParams();
-    
+
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        iosClientId: '581346763419-1v79br463i6ufa9mks5jd1kasj74nkr3.apps.googleusercontent.com',
+        webClientId: '581346763419-0b4visk3isdvfsrvtqal75qpsdmug0ie.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+        redirectUri: 'https://auth.expo.io/@gaelzamora/ropify-app-frontend',
+        usePKCE: false
+    })
+
+    console.log("Aqui ando")
+
     // Manejar deep links entrantes (cuando vuelve de la autenticación)
     useEffect(() => {
-        if (params && params.data) {
-            handleDeepLink(params.data as string);
+      if (typeof window !== "undefined") {
+        const accessToken = window.localStorage.getItem("google_access_token");
+        if (accessToken) {
+            console.log("Access token capturado desde localStorage:", accessToken);
+            handlerGoogleAuthentication(accessToken);
+            window.localStorage.removeItem("google_access_token");
+        } else {
+            console.log("AQUI NO HAY NADA ")
         }
-        
-        // Suscribirse a deep links futuros
-        const subscription = Linking.addEventListener('url', ({url}) => {
-            const { queryParams } = Linking.parse(url);
-            if (queryParams && queryParams.data) {
-                handleDeepLink(queryParams.data as string);
-            }
-        });
-        
-        return () => {
-            subscription.remove();
-        };
-    }, [params]);
+    }  
+    }, []);
     
-    // Procesar datos de autenticación recibidos por deep link
-    const handleDeepLink = async (encodedData: string) => {
+    async function handlerGoogleAuthentication(accessToken: string | undefined) {
+        console.log("HELOOOO")
+
+        if (!accessToken) {
+            console.log("No entre")
+            return;
+        } 
+        
         try {
-            const decoded = decodeURIComponent(encodedData);
-            const jsonData = Buffer.from(decoded, 'base64').toString();
-            const authData = JSON.parse(jsonData);
+            console.log("Entre aqui")
+
+            setIsGoogleLoading(true);
+            console.log("Access token recibido:", accessToken.substring(0, 10) + "...");
             
-            if (authData.token) {
-                await SecureStore.setItemAsync('userToken', authData.token);
+            // URL de tu backend (usa tu IP real)
+            const baseUrl = 'http://192.168.1.79:8080';
+            const response = await fetch(`${baseUrl}/api/oauth/google/token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ access_token: accessToken })
+            });
+            
+            const data = await response.json();
+            console.log("Respuesta del backend:", data);
+            
+            // Guardar token y datos de usuario
+            if (data.status === 'success' && data.data?.token) {
+                await SecureStore.setItemAsync('token', data.data.token); 
+                await AsyncStorage.setItem('user', JSON.stringify(data.data.user));
                 
-                // Obtener detalles del usuario usando el token
-                const response = await fetch('http://192.168.1.79:8080/api/auth/me', {
-                    headers: { 
-                        'Authorization': `Bearer ${authData.token}`
-                    }
-                });
-                const userData = await response.json();
-                
-                setUser(userData.data);
+                setUser(data.data.user);
                 setIsLoggedIn(true);
-                await AsyncStorage.setItem('user', JSON.stringify(userData.data));
-                
                 router.replace('/(authed)/(tabs)/settings');
+            } else {
+                console.error("Error en respuesta:", data);
             }
         } catch (error) {
-            console.error('Error procesando datos de autenticación:', error);
+            console.error('Error en la autenticación con Google:', error);
+        } finally {
+            setIsGoogleLoading(false);
         }
-    };
+    }
+
+    const handlerGoogleLogin = () => {
+        promptAsync()
+    }
     
     // Autenticación normal
     async function onAuthenticate() {
         await authenticate("login", email, password);
     }
     
-    // Iniciar autenticación de Google
-    async function handleGoogleLogin() {
-        try {
-            setIsGoogleLoading(true);
-            
-            // URL de redirección a nuestra app
-            const redirectUri = Linking.createURL('oauth-callback');
-            
-            // Abrir navegador con la URL de login de Google
-            const baseUrl = Platform.OS === 'android' 
-                ? 'http://192.168.1.XXX:8080' 
-                : 'http://localhost:8080';
-                
-            const result = await WebBrowser.openAuthSessionAsync(
-                `${baseUrl}/api/oauth/google/login?redirect_uri=${encodeURIComponent(redirectUri)}`,
-                redirectUri
-            );
-            
-            if (result.type === 'success') {
-                // La autenticación exitosa será manejada por el efecto que escucha los deep links
-                console.log("Login exitoso, esperando datos...");
-            }
-        } catch (error) {
-            console.error("Error de autenticación con Google:", error);
-        } finally {
-            setIsGoogleLoading(false);
-        }
-    }
 
     return (
         <KeyboardAvoidingView
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-            {/* Contenido existente */}
+            <TouchableOpacity style={styles.backButton} onPress={() => router.push("/")}>
+                <FontAwesome name="arrow-left" size={25} color="#211" />
+            </TouchableOpacity>
+            <View style={{ alignItems: "center" }}>
+                <Image
+                    source={require("@/assets/images/logo/letras.png")}
+                    style={{ width: "50%", height: 50 }} 
+                />
+            </View>
+            <Text style={styles.title}>Sign in</Text>
+
             <View style={styles.form}>
                 {/* Campos de login existentes */}
                 <TextInput
@@ -155,7 +182,7 @@ const Login: React.FC = () => {
             <View style={styles.socialContainer}>
                 <TouchableOpacity 
                     style={styles.socialButton}
-                    onPress={handleGoogleLogin}
+                    onPress={handlerGoogleLogin}
                     disabled={isGoogleLoading}
                 >
                     {isGoogleLoading ? (
@@ -171,6 +198,23 @@ const Login: React.FC = () => {
                     <FontAwesome name="twitter" size={28} color="#1DA1F2" />
                 </TouchableOpacity>
             </View>
+            
+            <Text style={{marginTop: 20, color: "#888", fontSize: 12}}>
+                ¿Problemas con el login de Google? Pega aquí el access_token:
+            </Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Pega el access_token aquí"
+                value={manualToken}
+                onChangeText={setManualToken}
+            />
+            <TouchableOpacity
+                style={styles.button}
+                onPress={() => console.log("HEY APRETANDO")}
+            >
+                <Text style={styles.buttonText}>Continuar con token</Text>
+            </TouchableOpacity>
+
         </KeyboardAvoidingView>
     );
 };
