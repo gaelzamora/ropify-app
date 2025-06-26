@@ -1,119 +1,70 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from "react-native";
 import { FontAwesome } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/context/AuthContext";
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import * as Google from 'expo-auth-session/providers/google'
-import { Image } from "react-native";
+import Constants from 'expo-constants'
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-require('dotenv').config()
-
-// Registrar para recibir el resultado de la autenticación
 WebBrowser.maybeCompleteAuthSession();
 
-if (typeof window !== "undefined") {
-  window.onload = () => {
-    if (window.location.hash.includes("access_token")) {
-      console.log("YA ENTRE (onload)");
-      const params = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = params.get("access_token");
-      if (accessToken) {
-        // Puedes usar un evento personalizado o guardar el token en localStorage
-        window.localStorage.setItem("google_access_token", accessToken);
-        // Limpia el hash
-        window.location.hash = "";
-        // Opcional: recarga la app o navega a la ruta deseada
-        window.location.reload();
-      }
-    }
-  };
-}
 
 const Login: React.FC = () => {
-    const { authenticate, setIsLoggedIn, setUser, isLoadingAuth } = useAuth();
+    const { authenticate, isLoadingAuth, authenticateWithGoogle } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-    const [manualToken, setManualToken] = useState("")
     const router = useRouter();
+    const [userInfo, setUserInfo] = useState<any>();
 
     const [request, response, promptAsync] = Google.useAuthRequest({
-        iosClientId: process.env.CLIENT_IOS_ID,
-        webClientId: process.env.CLIENT_WEB_ID,
-        scopes: ['profile', 'email'],
-        redirectUri: 'https://auth.expo.io/@gaelzamora/ropify-app-frontend',
-        usePKCE: false
+        iosClientId: Constants.expoConfig?.extra?.CLIENT_IOS_ID,
+        webClientId: Constants.expoConfig?.extra?.CLIENT_WEB_ID,
+        androidClientId: Constants.expoConfig?.extra?.CLIENT_ANDROID_ID,
     })
 
-    console.log("Aqui ando")
-
-    // Manejar deep links entrantes (cuando vuelve de la autenticación)
     useEffect(() => {
-      if (typeof window !== "undefined") {
-        const accessToken = window.localStorage.getItem("google_access_token");
-        if (accessToken) {
-            console.log("Access token capturado desde localStorage:", accessToken);
-            handlerGoogleAuthentication(accessToken);
-            window.localStorage.removeItem("google_access_token");
+        console.log("Google Auth Response: ", response)
+        handleEffect();
+    }, [response]);
+
+    async function handleEffect() {
+        const user = await getLocalUser();
+        console.log(user)
+        if (!user) {
+        if (response?.type === "success") {
+            await authenticateWithGoogle(response?.authentication?.accessToken)
+            //getUserInfo(response?.authentication?.accessToken ?? null);
+        }
         } else {
-            console.log("AQUI NO HAY NADA ")
+            setUserInfo(user);
         }
-    }  
-    }, []);
-    
-    async function handlerGoogleAuthentication(accessToken: string | undefined) {
-        console.log("HELOOOO")
+    }
+    const getLocalUser = async () => {
+        const data = await AsyncStorage.getItem("@user");
+        if (!data) return null;
+        return JSON.parse(data);
+    };
 
-        if (!accessToken) {
-            console.log("No entre")
-            return;
-        } 
-        
+    const getUserInfo = async (token: string | null) => {
+        if (!token) return;
         try {
-            console.log("Entre aqui")
+            const response = await fetch(
+                "https://www.googleapis.com/userinfo/v2/me",
+                {
+                headers: { Authorization: `Bearer ${token}` },
+                }
+            );
 
-            setIsGoogleLoading(true);
-            console.log("Access token recibido:", accessToken.substring(0, 10) + "...");
-            
-            // URL de tu backend (usa tu IP real)
-            const baseUrl = 'http://192.168.1.79:8080';
-            const response = await fetch(`${baseUrl}/api/oauth/google/token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ access_token: accessToken })
-            });
-            
-            const data = await response.json();
-            console.log("Respuesta del backend:", data);
-            
-            // Guardar token y datos de usuario
-            if (data.status === 'success' && data.data?.token) {
-                await SecureStore.setItemAsync('token', data.data.token); 
-                await AsyncStorage.setItem('user', JSON.stringify(data.data.user));
-                
-                setUser(data.data.user);
-                setIsLoggedIn(true);
-                router.replace('/(authed)/(tabs)/settings');
-            } else {
-                console.error("Error en respuesta:", data);
-            }
+            const user = await response.json();
+            setUserInfo(user);
         } catch (error) {
-            console.error('Error en la autenticación con Google:', error);
-        } finally {
-            setIsGoogleLoading(false);
+            console.log(error)
         }
-    }
+    };
 
-    const handlerGoogleLogin = () => {
-        promptAsync()
-    }
-    
     // Autenticación normal
     async function onAuthenticate() {
         await authenticate("login", email, password);
@@ -134,6 +85,7 @@ const Login: React.FC = () => {
                     style={{ width: "50%", height: 50 }} 
                 />
             </View>
+            {userInfo && <Text>{userInfo?.name}</Text>}
             <Text style={styles.title}>Sign in</Text>
 
             <View style={styles.form}>
@@ -182,17 +134,17 @@ const Login: React.FC = () => {
             <Text style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 20 }}>Or sign in with</Text>
             
             <View style={styles.socialContainer}>
+                
                 <TouchableOpacity 
                     style={styles.socialButton}
-                    onPress={handlerGoogleLogin}
-                    disabled={isGoogleLoading}
+                    onPress={() => promptAsync()}
                 >
                     {isGoogleLoading ? (
                         <ActivityIndicator size="small" color="#DB4437" />
                     ) : (
                         <FontAwesome name="google" size={28} color="#DB4437" />
                     )}
-                </TouchableOpacity>
+                </TouchableOpacity> 
                 <TouchableOpacity style={styles.socialButton}>
                     <FontAwesome name="facebook" size={28} color="#1877F3" />
                 </TouchableOpacity>
@@ -200,23 +152,6 @@ const Login: React.FC = () => {
                     <FontAwesome name="twitter" size={28} color="#1DA1F2" />
                 </TouchableOpacity>
             </View>
-            
-            <Text style={{marginTop: 20, color: "#888", fontSize: 12}}>
-                ¿Problemas con el login de Google? Pega aquí el access_token:
-            </Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Pega el access_token aquí"
-                value={manualToken}
-                onChangeText={setManualToken}
-            />
-            <TouchableOpacity
-                style={styles.button}
-                onPress={() => console.log("HEY APRETANDO")}
-            >
-                <Text style={styles.buttonText}>Continuar con token</Text>
-            </TouchableOpacity>
-
         </KeyboardAvoidingView>
     );
 };

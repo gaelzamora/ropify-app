@@ -11,7 +11,7 @@ interface AuthContextProps {
     authenticate: (authMode: "login" | "register", email: string, password: string, username?: string, firstName?: string, lastName?: string) => Promise<void>
     logout: VoidFunction;
     user: User | null;
-    authenticateWithGoogle: () => Promise<void>;
+    authenticateWithGoogle: (accessToken: string | undefined) => Promise<void>;
     setIsLoggedIn: (state: boolean) => void;
     setUser: (user: User) => void
 }
@@ -90,16 +90,21 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
         }
     }
 
-    async function authenticateWithGoogle() {
+    async function authenticateWithGoogle(accessToken: string | undefined) {
         try {
             setIsLoadingAuth(true);
-            const response = await oauthService.googleLogin();
-            
-            setIsLoggedIn(true);
-            await AsyncStorage.setItem("token", response.data.token);
-            await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
-            setUser(response.data.user);
-            router.replace("/(authed)/(tabs)/settings" as any);
+            if (accessToken) {
+                const response = await oauthService.getTokenFromGoogle(accessToken);
+                console.log(response)
+                
+                setIsLoggedIn(true);
+                await AsyncStorage.setItem("token", response.data.token);
+                await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+                setUser(response.data.user);
+                router.replace("/(authed)/(tabs)/settings" as any);
+            } else {
+                console.log("No hay access token que mandar.")
+            }
         } catch (error) {
             console.error("Google authentication failed:", error);
             // Mostrar un toast o alerta al usuario

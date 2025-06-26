@@ -6,8 +6,6 @@ async function login(email: string, password: string): Promise<AuthResponse> {
 }
 
 async function register(firstName: string, lastName: string, username: string, email: string, password: string): Promise<AuthResponse> {
-    console.log("Mandando info..,")
-    console.log("first name: ", firstName, "lastname: ", lastName, " username: ", username, "email: ", email, " password: ", password)
     return Api.post("/auth/register", { firstName, lastName, username, email, password })
 }
 

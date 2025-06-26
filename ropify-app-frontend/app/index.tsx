@@ -22,7 +22,7 @@ export default function Index() {
                 >
                     Hello.
                 </TypeWriter>
-                <Text style={styles.secundaryText}>Let's Get Started!</Text>
+                <Text style={styles.secundaryText}>Lets Get Started!</Text>
         
                 <TouchableOpacity 
                     style={[styles.button, { marginTop: 40 }]}
