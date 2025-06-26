@@ -95,13 +95,18 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
             setIsLoadingAuth(true);
             if (accessToken) {
                 const response = await oauthService.getTokenFromGoogle(accessToken);
-                console.log(response)
+
+                if (response) {
+                    setIsLoggedIn(true);
+                    await AsyncStorage.setItem("token", response.data.token);
+                    await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+                    setUser(response.data.user);
+                    router.replace("/(authed)/(tabs)/settings" as any);
+                    console.log("New user: ", user)
+                } else {
+                    console.log("No hay response")
+                }
                 
-                setIsLoggedIn(true);
-                await AsyncStorage.setItem("token", response.data.token);
-                await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
-                setUser(response.data.user);
-                router.replace("/(authed)/(tabs)/settings" as any);
             } else {
                 console.log("No hay access token que mandar.")
             }

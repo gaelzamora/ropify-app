@@ -10,6 +10,7 @@ import (
 	"github.com/gaelzamora/ropify-app/repositories"
 	"github.com/gaelzamora/ropify-app/services"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
@@ -21,6 +22,14 @@ func main() {
 		ServerHeader: "Fiber",
 		BodyLimit:    20 * 1024 * 1024,
 	})
+
+	app.Use(cors.New(cors.Config{
+		// Lista de orígenes específicos (no usar comodín "*")
+		AllowOrigins:     "http://localhost:8081,http://192.168.1.78:8081",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowCredentials: true,
+	}))
 
 	// Repository
 	garmentRepository := repositories.NewGarmentRepository(db)

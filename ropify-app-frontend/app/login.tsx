@@ -6,10 +6,13 @@ import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/context/AuthContext";
 import * as Google from 'expo-auth-session/providers/google'
 import Constants from 'expo-constants'
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ScrollView } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
+const webClientId = Constants.expoConfig?.extra?.CLIENT_WEB_ID;
+const iosClientId = Constants.expoConfig?.extra?.CLIENT_IOS_ID;
+const androidClientId = Constants.expoConfig?.extra?.CLIENT_ANDROID_ID;
 
 const Login: React.FC = () => {
     const { authenticate, isLoadingAuth, authenticateWithGoogle } = useAuth();
@@ -17,12 +20,11 @@ const Login: React.FC = () => {
     const [password, setPassword] = useState("");
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const router = useRouter();
-    const [userInfo, setUserInfo] = useState<any>();
 
     const [request, response, promptAsync] = Google.useAuthRequest({
-        iosClientId: Constants.expoConfig?.extra?.CLIENT_IOS_ID,
-        webClientId: Constants.expoConfig?.extra?.CLIENT_WEB_ID,
-        androidClientId: Constants.expoConfig?.extra?.CLIENT_ANDROID_ID,
+        webClientId,
+        iosClientId,
+        androidClientId,
     })
 
     useEffect(() => {
@@ -31,39 +33,10 @@ const Login: React.FC = () => {
     }, [response]);
 
     async function handleEffect() {
-        const user = await getLocalUser();
-        console.log(user)
-        if (!user) {
         if (response?.type === "success") {
             await authenticateWithGoogle(response?.authentication?.accessToken)
-            //getUserInfo(response?.authentication?.accessToken ?? null);
-        }
-        } else {
-            setUserInfo(user);
         }
     }
-    const getLocalUser = async () => {
-        const data = await AsyncStorage.getItem("@user");
-        if (!data) return null;
-        return JSON.parse(data);
-    };
-
-    const getUserInfo = async (token: string | null) => {
-        if (!token) return;
-        try {
-            const response = await fetch(
-                "https://www.googleapis.com/userinfo/v2/me",
-                {
-                headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-
-            const user = await response.json();
-            setUserInfo(user);
-        } catch (error) {
-            console.log(error)
-        }
-    };
 
     // Autenticación normal
     async function onAuthenticate() {
@@ -79,79 +52,84 @@ const Login: React.FC = () => {
             <TouchableOpacity style={styles.backButton} onPress={() => router.push("/")}>
                 <FontAwesome name="arrow-left" size={25} color="#211" />
             </TouchableOpacity>
-            <View style={{ alignItems: "center" }}>
-                <Image
-                    source={require("@/assets/images/logo/letras.png")}
-                    style={{ width: "50%", height: 50 }} 
-                />
-            </View>
-            {userInfo && <Text>{userInfo?.name}</Text>}
-            <Text style={styles.title}>Sign in</Text>
 
-            <View style={styles.form}>
-                {/* Campos de login existentes */}
-                <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    placeholderTextColor={"#888"}
-                    cursorColor={"#888"}
-                    value={email}
-                    onChangeText={setEmail}
-                />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    placeholderTextColor={"#888"}
-                    cursorColor={"#888"}
-                    value={password}
-                    onChangeText={setPassword}
-                />
-                <TouchableOpacity 
-                    style={styles.button}
-                    onPress={onAuthenticate}
-                    disabled={isLoadingAuth}
-                >
-                    {isLoadingAuth ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={styles.buttonText}>Login</Text>
-                    )}
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    onPress={() => router.push('/register')}
-                    style={styles.loginLink}
-                >
-                    <Text style={styles.loginText}>Already not have an account? <Text style={styles.loginTextBold}>Sign Up</Text></Text>
-                </TouchableOpacity>
-            </View>
-            
-            <Text style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 20 }}>Or sign in with</Text>
-            
-            <View style={styles.socialContainer}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={{ alignItems: "center" }}>
+                    <Image
+                        source={require("@/assets/images/logo/letras.png")}
+                        style={{ width: "50%", height: 50 }}
+                    />
+                </View>
+                <Text style={styles.title}>Sign in</Text>
+
+                <View style={styles.form}>
+                    {/* Campos de login existentes */}
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Email"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        placeholderTextColor={"#888"}
+                        cursorColor={"#888"}
+                        value={email}
+                        onChangeText={setEmail}
+                    />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Password"
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        placeholderTextColor={"#888"}
+                        cursorColor={"#888"}
+                        value={password}
+                        onChangeText={setPassword}
+                    />
+                    <TouchableOpacity 
+                        style={styles.button}
+                        onPress={onAuthenticate}
+                        disabled={isLoadingAuth}
+                    >
+                        {isLoadingAuth ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>Login</Text>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        onPress={() => router.push('/register')}
+                        style={styles.loginLink}
+                    >
+                        <Text style={styles.loginText}>Already not have an account? <Text style={styles.loginTextBold}>Sign Up</Text></Text>
+                    </TouchableOpacity>
+                </View>
                 
-                <TouchableOpacity 
-                    style={styles.socialButton}
-                    onPress={() => promptAsync()}
-                >
-                    {isGoogleLoading ? (
-                        <ActivityIndicator size="small" color="#DB4437" />
-                    ) : (
-                        <FontAwesome name="google" size={28} color="#DB4437" />
-                    )}
-                </TouchableOpacity> 
-                <TouchableOpacity style={styles.socialButton}>
-                    <FontAwesome name="facebook" size={28} color="#1877F3" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                    <FontAwesome name="twitter" size={28} color="#1DA1F2" />
-                </TouchableOpacity>
-            </View>
+                <Text style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 20 }}>Or sign in with</Text>
+                
+                <View style={styles.socialContainer}>
+                    
+                    <TouchableOpacity 
+                        style={styles.socialButton}
+                        onPress={() => promptAsync()}
+                    >
+                        {isGoogleLoading ? (
+                            <ActivityIndicator size="small" color="#DB4437" />
+                        ) : (
+                            <FontAwesome name="google" size={28} color="#DB4437" />
+                        )}
+                    </TouchableOpacity> 
+                    <TouchableOpacity style={styles.socialButton}>
+                        <FontAwesome name="facebook" size={28} color="#1877F3" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.socialButton}>
+                        <FontAwesome name="twitter" size={28} color="#1DA1F2" />
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
         </KeyboardAvoidingView>
     );
 };
@@ -164,6 +142,14 @@ const styles = StyleSheet.create({
         alignItems: "center",
         padding: 16,
         position: "relative"
+    },
+    scrollContainer: {
+        flexGrow: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        paddingTop: 80,
+        paddingBottom: 40,
     },
     backButton: {
         position: "absolute",

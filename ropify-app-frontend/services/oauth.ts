@@ -1,8 +1,7 @@
 import { Api } from "./api";
 
-async function getTokenFromGoogle(accessToken: string) {
-  console.log(accessToken)
-  return Api.post("/oauth/google/token", { accessToken })
+async function getTokenFromGoogle(access_token: string) {
+  return Api.post("/oauth/google/token", { access_token })
 }
 
 const oauthService = {
