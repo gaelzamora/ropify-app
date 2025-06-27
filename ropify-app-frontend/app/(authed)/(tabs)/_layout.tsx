@@ -1,25 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { ComponentProps } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
 
 export default function TabLayout() {
 
     const tabs = [
         {
-            name: "(home)",
-            displayName: "Home",
-            icon: "home-sharp",
+            name: "(feed)",
+            displayName: "Feed",
+            icon: "flame",
+        },
+        {
+            name: "(friends)",
+            displayName: "Friends",
+            icon: "people",
         },
         {
             name: "(closet)",
-            displayName: "Notes",
-            icon: "document-text-sharp",
+            displayName: "Closet",
+            icon: "folder",
         },
         {
             name: "settings",
             displayName: "Settings",
-            icon: "settings-outline",
+            icon: "settings-sharp",
         },
     ];  
 
@@ -31,7 +36,8 @@ export default function TabLayout() {
                         backgroundColor: "transparent",
                         borderTopWidth: 0,
                         elevation: 0,
-                        height: 120,
+                        height: 100,
+                        
                     },
                     headerShown: false,
                 }}
@@ -41,20 +47,21 @@ export default function TabLayout() {
                         key={tab.name}
                         name={tab.name}
                         options={{
-                            tabBarLabel: () => null,    
+                            tabBarLabel: ({ focused }) => (
+                                <Text style={{ fontSize: 12, marginTop: 35, fontWeight: "500", color: focused ? "#e85a5a" : "#949598" }}>
+                                    {tab.displayName}
+                                </Text> 
+                            ),
                             tabBarIcon: ({ focused }) => (
                                 <View style={[
                                     styles.containerIcon,
-                                    focused && styles.activeIcon
                                 ]}>
                                     <Ionicons
                                         name={
-                                             tab.name === "settings"
-                                            ? (focused ? "settings-outline" : "settings-sharp")
-                                            : tab.icon as ComponentProps<typeof Ionicons>["name"]   
+                                            tab.icon as ComponentProps<typeof Ionicons>["name"]   
                                         }
                                         size={28}
-                                        color={focused ? "white" : "#949598"}
+                                        color={focused ? "#e85a5a" : "#949598"}
                                     />
                                 </View>
                             ),

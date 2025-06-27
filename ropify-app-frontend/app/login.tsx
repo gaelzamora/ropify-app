@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Image, ScrollView } from "react-native";
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/context/AuthContext";
 import * as Google from 'expo-auth-session/providers/google'
 import Constants from 'expo-constants'
-import { ScrollView } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -18,7 +17,6 @@ const Login: React.FC = () => {
     const { authenticate, isLoadingAuth, authenticateWithGoogle } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const router = useRouter();
 
     const [request, response, promptAsync] = Google.useAuthRequest({
@@ -28,7 +26,6 @@ const Login: React.FC = () => {
     })
 
     useEffect(() => {
-        console.log("Google Auth Response: ", response)
         handleEffect();
     }, [response]);
 
@@ -57,16 +54,15 @@ const Login: React.FC = () => {
                 contentContainerStyle={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={{ alignItems: "center" }}>
-                    <Image
-                        source={require("@/assets/images/logo/letras.png")}
-                        style={{ width: "50%", height: 50 }}
-                    />
-                </View>
-                <Text style={styles.title}>Sign in</Text>
 
                 <View style={styles.form}>
-                    {/* Campos de login existentes */}
+                    <View style={{ alignItems: "center" }}>
+                        <Image
+                            source={require("@/assets/images/logo/letras.png")}
+                            style={{ width: "60%", height: 50 }}
+                        />
+                    </View>
+                    <Text style={styles.title}>Sign in</Text>
                     <TextInput
                         style={styles.input}
                         placeholder="Email"
@@ -116,7 +112,7 @@ const Login: React.FC = () => {
                         style={styles.socialButton}
                         onPress={() => promptAsync()}
                     >
-                        {isGoogleLoading ? (
+                        {isLoadingAuth ? (
                             <ActivityIndicator size="small" color="#DB4437" />
                         ) : (
                             <FontAwesome name="google" size={28} color="#DB4437" />

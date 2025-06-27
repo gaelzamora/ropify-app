@@ -79,7 +79,7 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
                     await AsyncStorage.setItem("token", response.data.token)
                     await AsyncStorage.setItem("user", JSON.stringify(response.data.user))
                     setUser(response.data.user)
-                    router.replace("/(authed)/(tabs)/settings" as any)
+                    router.replace("/(authed)/(tabs)/(closet)" as any)
                 
             }
         } catch (error) {
@@ -101,7 +101,7 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
                     await AsyncStorage.setItem("token", response.data.token);
                     await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
                     setUser(response.data.user);
-                    router.replace("/(authed)/(tabs)/settings" as any);
+                    router.replace("/(authed)/(tabs)/(closet)" as any);
                     console.log("New user: ", user)
                 } else {
                     console.log("No hay response")
