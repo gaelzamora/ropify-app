@@ -17,6 +17,7 @@ const (
 	Sneakers   GarmentCategory = "snearkers"
 	Accesories GarmentCategory = "accesories"
 	Backpack   GarmentCategory = "backpack"
+	Unknown    GarmentCategory = "unknown"
 )
 
 type Garment struct {

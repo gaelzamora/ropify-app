@@ -4,8 +4,8 @@ export type GarmentResponse = ApiResponse<{ message: string, data: Garment}>
 export type GarmentListResponse = ApiResponse<Garment[]>
 
 export type Garment = {
-    id: number
-    user_id: number
+    id: string
+    user_id: string
     name: string
     category: string
     color: string

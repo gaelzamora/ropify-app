@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
@@ -250,7 +251,130 @@ func (h *GarmentHandler) UploadGarmentImage(ctx *fiber.Ctx) error {
 		"message": "Garment image uploaded successfully",
 		"data":    imageURL,
 	})
+}
 
+func (h *GarmentHandler) LookupByBarcode(ctx *fiber.Ctx) error {
+	var payload struct{ Barcode string }
+
+	if err := ctx.BodyParser(&payload); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid request data",
+		})
+	}
+
+	productData, err := services.BarcodeLookup(payload.Barcode)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error calling external API: " + err.Error(),
+		})
+	}
+
+	userIdStr := ctx.Locals("userId").(string)
+	userId, err := uuid.Parse(userIdStr)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid user ID",
+		})
+	}
+
+	// Mapear la categoría de la API a tu enum de GarmentCategory
+	category := models.Unknown // Valor predeterminado
+	switch productData.Category {
+	case "Tops", "Shirt", "T-Shirt":
+		category = models.Top
+	case "Bottoms", "Pants", "Jeans", "Shorts":
+		category = models.Bottoms
+	case "Dress", "Dresses":
+		category = models.Dress
+	case "Sneakers", "Shoes":
+		category = models.Sneakers
+	case "Accessories", "Jewelry", "Watches":
+		category = models.Accesories
+	case "Backpack", "Bag":
+		category = models.Backpack
+	default:
+		category = models.Unknown // Por defecto
+	}
+
+	garment := models.Garment{
+		ID:         uuid.New(),
+		UserID:     userId,
+		Name:       productData.ProductName,
+		Category:   category,
+		Color:      productData.Color,
+		Brand:      productData.Brand,
+		Size:       productData.Size,
+		ImageURL:   productData.ImageURL,
+		Barcode:    productData.Barcode,
+		IsVerified: true, // Asumimos que los productos de la API son verificados
+		CreatedAt:  time.Now(),
+	}
+
+	ctxDB, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	newGarment, err := h.repository.AddGarment(ctxDB, &garment)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error saving garment in DB: " + err.Error(),
+		})
+	}
+
+	return ctx.JSON(fiber.Map{
+		"status": "success",
+		"data":   newGarment,
+	})
+}
+
+func (h *GarmentHandler) AnalyzeGarmentImage(ctx *fiber.Ctx) error {
+	file, err := ctx.FormFile("image")
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "No se proporciono una imagen",
+		})
+	}
+
+	fileContent, err := file.Open()
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error al abrir una imagen",
+		})
+	}
+	defer fileContent.Close()
+
+	imageBytes, err := io.ReadAll(fileContent)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error al leer la imagen",
+		})
+	}
+
+	visionResult, err := services.AnalyzeGarmentImage(imageBytes)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error al analizar la imagen: " + err.Error(),
+		})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status": "success",
+		"data": fiber.Map{
+			"labels":   visionResult.Labels,
+			"category": visionResult.MainCategory,
+			"colors":   visionResult.Colors,
+		},
+	})
 }
 
 func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository) {
@@ -259,9 +383,15 @@ func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository)
 	}
 
 	router.Post("/", handler.AddGarment)
+	router.Post("/barcode", handler.LookupByBarcode)
 	router.Post("/:id", handler.UploadGarmentImage)
+
+	router.Post("/analyze", handler.AnalyzeGarmentImage)
+
 	router.Get("/", handler.FilterGarments)
 	router.Get("/:barcode", handler.FindByBarcode)
+
 	router.Patch("/:id", handler.UpdateGarment)
+
 	router.Delete("/:id", handler.DeleteGarment)
 }

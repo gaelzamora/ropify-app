@@ -6,6 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { garmentService } from "@/services/garment";
 import { useFocusEffect } from "expo-router";
 import Modal from 'react-native-modal'
+import * as ImagePicker from 'expo-image-picker'
+import {Camera} from 'expo-camera'
 
 const garmentCategories = [
     "all",
@@ -23,6 +25,10 @@ export default function ClosetScreen() {
     const { user } = useAuth()
     const [isLoading, setIsLoading] = useState(false)
 
+    // Scanner
+    const [analyzing, setAnalyzing] = useState(false)
+    const [garmentData, setGarmentData] = useState<Garment>()
+
     const [isModalActive, setIsModalActive] = useState(false)
 
     const fetchClothes = async (category: string) => {
@@ -34,6 +40,58 @@ export default function ClosetScreen() {
             Alert.alert("Error: ", String(error))
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const takePhotoAndAnalyze = async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync()
+
+        if (status !== 'granted') {
+            Alert.alert('Se requieren permisos para la camara')
+            return
+        }
+
+        let result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 1,
+        })
+
+        if (result.canceled) {
+            return
+        }
+
+        try {
+            setAnalyzing(true)
+            const imageUri = result.assets[0].uri
+
+            // Enviar al backend para analisis
+
+            const response = await garmentService.analyzeGarmentImage(imageUri)
+
+            if (response.data && response.status === 200) {
+                const { colors, category } = response.data
+
+                if (garmentData?.id && garmentData.user_id && user) {
+                    setGarmentData({
+                        id: garmentData.id,
+                        user_id: user.id,
+                        name: garmentData?.name ?? "",
+                        brand: garmentData?.brand ?? "",
+                        size: garmentData?.size ?? "",
+                        barcode: garmentData?.barcode ?? "",
+                        is_verified: garmentData?.is_verified ?? "",
+                        category: category || garmentData?.category || "",
+                        color: colors && colors.length > 0 ? colors[0].name : garmentData?.color || "",
+                        image_url: imageUri, // Guardar URI local temporalmente
+                    })
+                }
+            }
+        } catch (error) {
+            console.error('Error analyzing image: ', error)
+            Alert.alert('Error', 'No se pudo analizar la imagen')
+        } finally {
+            setAnalyzing(false)
         }
     }
 
@@ -113,7 +171,10 @@ export default function ClosetScreen() {
                     bottom: 15,
                 }}
             >
-                <TouchableOpacity style={styles.iconTouchable}>
+                <TouchableOpacity 
+                    style={styles.iconTouchable}
+                    onPress={takePhotoAndAnalyze}
+                >
                     <Ionicons
                         name={"scan"}
                         size={28}
