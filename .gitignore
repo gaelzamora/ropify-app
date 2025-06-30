@@ -1,2 +1,4 @@
+ropify-app-backend/credentials/*.json
 .env
-ropify-app-370a404eadfc.json
+*.key
+*.pem
