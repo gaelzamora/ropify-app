@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
+	"github.com/gaelzamora/ropify-app/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
@@ -15,14 +17,48 @@ type GarmentHandler struct {
 }
 
 func (h *GarmentHandler) AddGarment(ctx *fiber.Ctx) error {
+	// 1. Parsear los datos JSON del garment
 	var garment models.Garment
-
 	if err := ctx.BodyParser(&garment); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
 			"message": err.Error(),
 		})
 	}
+
+	// 2. Obtener el userId del token de autenticación
+	userIdStr := ctx.Locals("userId").(string)
+	userId, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid user ID",
+		})
+	}
+
+	// Asignar el userId al garment
+	garment.UserID = userId
+
+	// 3. Procesar la imagen si existe
+	file, err := ctx.FormFile("garment_image")
+	var imageURL string
+
+	if err == nil && file != nil {
+		// Si hay una imagen, subirla a S3
+		key := fmt.Sprintf("garments/users/%s", userId.String())
+		imageURL, err = services.UploadToS3(file, key)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"status":  "fail",
+				"message": "Failed to upload image: " + err.Error(),
+			})
+		}
+
+		// Asignar la URL de la imagen al garment
+		garment.ImageURL = imageURL
+	}
+
+	// 4. Guardar el garment en la base de datos
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -33,6 +69,7 @@ func (h *GarmentHandler) AddGarment(ctx *fiber.Ctx) error {
 			"message": err.Error(),
 		})
 	}
+
 	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"status": "success",
 		"data":   newGarment,
@@ -162,12 +199,67 @@ func (h *GarmentHandler) FilterGarments(ctx *fiber.Ctx) error {
 
 }
 
+func (h *GarmentHandler) UploadGarmentImage(ctx *fiber.Ctx) error {
+	garmentIdStr := ctx.Params("id")
+	garmentId, err := uuid.Parse(garmentIdStr)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Invalid garment ID",
+		})
+	}
+
+	file, err := ctx.FormFile("garment_image")
+
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Failed to upload file",
+		})
+	}
+
+	userIdStr := ctx.Locals("userId").(string)
+	userId, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Invalid user ID",
+		})
+	}
+
+	key := fmt.Sprintf("garments/%s/%s", userId.String(), file.Filename)
+
+	imageURL, err := services.UploadToS3(file, key)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Failed to upload file to S3",
+		})
+	}
+
+	if err := h.repository.UpdateGarmentImage(userId, imageURL, garmentId); err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Failed to update garment image",
+		})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(&fiber.Map{
+		"status":  "success",
+		"message": "Garment image uploaded successfully",
+		"data":    imageURL,
+	})
+
+}
+
 func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository) {
 	handler := &GarmentHandler{
 		repository: repository,
 	}
 
 	router.Post("/", handler.AddGarment)
+	router.Post("/:id", handler.UploadGarmentImage)
 	router.Get("/", handler.FilterGarments)
 	router.Get("/:barcode", handler.FindByBarcode)
 	router.Patch("/:id", handler.UpdateGarment)

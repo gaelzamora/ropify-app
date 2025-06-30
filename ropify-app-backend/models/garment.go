@@ -42,6 +42,8 @@ type GarmentRepository interface {
 	DeleteGarment(ctx context.Context, garmentID uuid.UUID) error
 
 	FilterGarments(ctx context.Context, userID uuid.UUID, filters map[string]interface{}, sortBy string, limit, offset int) ([]*Garment, error)
+
+	UpdateGarmentImage(userId uuid.UUID, imageURL string, garmentId uuid.UUID) error
 }
 
 func (g *Garment) BeforeCreate(tx *gorm.DB) (err error) {

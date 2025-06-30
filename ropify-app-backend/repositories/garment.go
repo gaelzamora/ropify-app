@@ -66,6 +66,12 @@ func (r *GarmentRepository) FilterGarments(ctx context.Context, userID uuid.UUID
 	return garments, nil
 }
 
+func (r *GarmentRepository) UpdateGarmentImage(userId uuid.UUID, imageURL string, garmentId uuid.UUID) error {
+	return r.db.Model(&models.Garment{}).
+		Where("id = ? AND user_id = ?", garmentId, userId).
+		Update("image_url", imageURL).Error
+}
+
 func NewGarmentRepository(db *gorm.DB) models.GarmentRepository {
 	return &GarmentRepository{
 		db: db,

@@ -4,7 +4,7 @@ export type AuthResponse = ApiResponse<{ token: string, user: User }>
 
 
 export type User = {
-    id: number;
+    id: string;
     username: string;
     firstName: string;
     lastName: string;

@@ -24,7 +24,6 @@ func main() {
 	})
 
 	app.Use(cors.New(cors.Config{
-		// Lista de orígenes específicos (no usar comodín "*")
 		AllowOrigins:     "http://localhost:8081,http://192.168.1.78:8081",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",

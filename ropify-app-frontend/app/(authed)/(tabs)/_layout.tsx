@@ -8,23 +8,23 @@ export default function TabLayout() {
     const tabs = [
         {
             name: "(feed)",
-            displayName: "Feed",
-            icon: "flame",
-        },
-        {
-            name: "(friends)",
-            displayName: "Friends",
-            icon: "people",
+            displayName: "Home",
+            icon: "home-outline",
         },
         {
             name: "(closet)",
             displayName: "Closet",
-            icon: "folder",
+            icon: "folder-outline",
         },
         {
-            name: "settings",
-            displayName: "Settings",
-            icon: "settings-sharp",
+            name: "(outfit)",
+            displayName: "Outfit",
+            icon: "folder-outline",
+        },
+        {
+            name: "profile",
+            displayName: "Profile",
+            icon: "settings-outline",
         },
     ];  
 
@@ -33,11 +33,12 @@ export default function TabLayout() {
             <Tabs
                 screenOptions={{
                     tabBarStyle: {
-                        backgroundColor: "transparent",
+                        backgroundColor: "#fff",
                         borderTopWidth: 0,
                         elevation: 0,
-                        height: 100,
-                        
+                        height: 110,
+                        paddingTop: 30,
+                        zIndex: 40
                     },
                     headerShown: false,
                 }}
@@ -47,22 +48,22 @@ export default function TabLayout() {
                         key={tab.name}
                         name={tab.name}
                         options={{
-                            tabBarLabel: ({ focused }) => (
-                                <Text style={{ fontSize: 12, marginTop: 35, fontWeight: "500", color: focused ? "#e85a5a" : "#949598" }}>
-                                    {tab.displayName}
-                                </Text> 
-                            ),
+                            tabBarLabel: () => null, 
                             tabBarIcon: ({ focused }) => (
-                                <View style={[
-                                    styles.containerIcon,
-                                ]}>
+                                <View style={{ alignItems: "center", justifyContent: "center", width: 100 }}>
                                     <Ionicons
-                                        name={
-                                            tab.icon as ComponentProps<typeof Ionicons>["name"]   
-                                        }
+                                        name={tab.icon as ComponentProps<typeof Ionicons>["name"]}
                                         size={28}
                                         color={focused ? "#e85a5a" : "#949598"}
                                     />
+                                    <Text style={{
+                                        fontSize: 12,
+                                        marginTop: 4,
+                                        fontWeight: "500",
+                                        color: focused ? "#e85a5a" : "#949598"
+                                    }}>
+                                        {tab.displayName}
+                                    </Text>
                                 </View>
                             ),
                         }}
