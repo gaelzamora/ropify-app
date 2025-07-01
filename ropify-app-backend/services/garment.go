@@ -142,28 +142,45 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 
 	var labelTexts []string
 	var mainCategory string
-	clothingLabels := map[string]bool{
-		"shirt":    true,
-		"t-shirt":  true,
-		"pants":    true,
-		"jeans":    true,
-		"shoes":    true,
-		"sneakers": true,
-		"dress":    true,
-		"jacket":   true,
-		"sweater":  true,
-		"hoodie":   true,
-		"skirt":    true,
-		"shorts":   true,
-		"coat":     true,
+
+	clothingCategories := map[string]string{
+		"shirt":      "top",
+		"t-shirt":    "top",
+		"t shirt":    "top",
+		"polo":       "top",
+		"polo shirt": "top",
+		"blouse":     "top",
+		"pants":      "bottom",
+		"jeans":      "bottom",
+		"shorts":     "bottom",
+		"skirt":      "bottom",
+		"dress":      "dress",
+		"sneakers":   "sneakers",
+		"shoes":      "sneakers",
+		"hat":        "accessories",
+		"jacket":     "top",
+		"sweater":    "top",
+		"hoodie":     "top",
+		"coat":       "top",
+		"backpack":   "backpack",
+		"bag":        "backpack",
 	}
 
 	for _, label := range labels {
 		labelTexts = append(labelTexts, label.Description)
 
-		lowercaseLabel := strings.ToLower(label.Description)
-		if _, ok := clothingLabels[lowercaseLabel]; ok && mainCategory == "" {
-			mainCategory = label.Description
+		normLabel := strings.ToLower(strings.TrimSpace(label.Description))
+
+		if category, ok := clothingCategories[normLabel]; ok {
+			mainCategory = category
+			break
+		}
+
+		for key, value := range clothingCategories {
+			if strings.Contains(normLabel, key) {
+				mainCategory = value
+				break
+			}
 		}
 	}
 
@@ -190,10 +207,10 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 
 func getColorName(r, g, b float32) string {
 	// Implementación básica de mapeo de colores
-	if r > 200 && g < 100 && b < 100 {
-		return "red"
-	} else if r < 100 && g > 200 && b < 100 {
+	if r < 120 && g > 100 && g > r+50 && g > b+20 {
 		return "green"
+	} else if r > 200 && g < 100 && b < 100 {
+		return "red"
 	} else if r < 100 && g < 100 && b > 200 {
 		return "blue"
 	} else if r > 200 && g > 200 && b < 100 {

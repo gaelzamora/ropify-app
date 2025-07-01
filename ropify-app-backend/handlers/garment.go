@@ -333,12 +333,22 @@ func (h *GarmentHandler) LookupByBarcode(ctx *fiber.Ctx) error {
 	})
 }
 
-func (h *GarmentHandler) AnalyzeGarmentImage(ctx *fiber.Ctx) error {
+func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
+	userIdStr := ctx.Locals("userId").(string)
+	userId, err := uuid.Parse(userIdStr)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid user ID",
+		})
+	}
+
 	file, err := ctx.FormFile("image")
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
-			"message": "No se proporciono una imagen",
+			"message": "No image provided",
 		})
 	}
 
@@ -346,7 +356,7 @@ func (h *GarmentHandler) AnalyzeGarmentImage(ctx *fiber.Ctx) error {
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
-			"message": "Error al abrir una imagen",
+			"message": "Error opening image",
 		})
 	}
 	defer fileContent.Close()
@@ -355,7 +365,7 @@ func (h *GarmentHandler) AnalyzeGarmentImage(ctx *fiber.Ctx) error {
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
-			"message": "Error al leer la imagen",
+			"message": "Error reading image",
 		})
 	}
 
@@ -363,16 +373,70 @@ func (h *GarmentHandler) AnalyzeGarmentImage(ctx *fiber.Ctx) error {
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
-			"message": "Error al analizar la imagen: " + err.Error(),
+			"message": "Error analying image: " + err.Error(),
 		})
 	}
 
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+	key := fmt.Sprintf("garments/users/%s", userId.String())
+	imageURL, err := services.UploadToS3(file, key)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error uploading image to S3",
+		})
+	}
+
+	var category models.GarmentCategory
+	switch visionResult.MainCategory {
+	case "top":
+		category = models.Top
+	case "bottom":
+		category = models.Bottoms
+	case "dress":
+		category = models.Dress
+	case "sneakers":
+		category = models.Sneakers
+	case "accessories":
+		category = models.Accesories
+	case "backpack":
+		category = models.Backpack
+	default:
+		category = models.Unknown
+	}
+
+	color := "unknown"
+	if len(visionResult.Colors) > 0 {
+		color = visionResult.Colors[0].Name
+	}
+
+	garment := models.Garment{
+		UserID:     userId,
+		Name:       fmt.Sprintf("%s %s", color, visionResult.MainCategory),
+		Category:   category,
+		Color:      color,
+		Brand:      "", // Podría ser completado por el usuario después
+		Size:       "", // Podría ser completado por el usuario después
+		ImageURL:   imageURL,
+		IsVerified: true,
+		CreatedAt:  time.Now(),
+	}
+
+	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	newGarment, err := h.repository.AddGarment(context, &garment)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Error al crear prenda: " + err.Error(),
+		})
+	}
+
+	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"status": "success",
 		"data": fiber.Map{
-			"labels":   visionResult.Labels,
-			"category": visionResult.MainCategory,
-			"colors":   visionResult.Colors,
+			"garment":  newGarment,
+			"analysis": visionResult,
 		},
 	})
 }
@@ -384,9 +448,8 @@ func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository)
 
 	router.Post("/", handler.AddGarment)
 	router.Post("/barcode", handler.LookupByBarcode)
+	router.Post("/analyze", handler.AnalyzeAndCreateGarment)
 	router.Post("/:id", handler.UploadGarmentImage)
-
-	router.Post("/analyze", handler.AnalyzeGarmentImage)
 
 	router.Get("/", handler.FilterGarments)
 	router.Get("/:barcode", handler.FindByBarcode)
