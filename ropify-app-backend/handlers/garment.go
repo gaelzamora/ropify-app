@@ -18,7 +18,6 @@ type GarmentHandler struct {
 }
 
 func (h *GarmentHandler) AddGarment(ctx *fiber.Ctx) error {
-	// 1. Parsear los datos JSON del garment
 	var garment models.Garment
 	if err := ctx.BodyParser(&garment); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -27,7 +26,6 @@ func (h *GarmentHandler) AddGarment(ctx *fiber.Ctx) error {
 		})
 	}
 
-	// 2. Obtener el userId del token de autenticación
 	userIdStr := ctx.Locals("userId").(string)
 	userId, err := uuid.Parse(userIdStr)
 	if err != nil {
@@ -36,30 +34,43 @@ func (h *GarmentHandler) AddGarment(ctx *fiber.Ctx) error {
 			"message": "Invalid user ID",
 		})
 	}
-
-	// Asignar el userId al garment
 	garment.UserID = userId
 
-	// 3. Procesar la imagen si existe
+	// Procesar imagen si existe
 	file, err := ctx.FormFile("garment_image")
 	var imageURL string
 
 	if err == nil && file != nil {
 		// Si hay una imagen, subirla a S3
 		key := fmt.Sprintf("garments/users/%s", userId.String())
-		imageURL, err = services.UploadToS3(file, key)
+		// Si quieres procesar la imagen antes de subirla, lee los bytes:
+		src, err := file.Open()
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"status":  "fail",
+				"message": "Failed to open file: " + err.Error(),
+			})
+		}
+		defer src.Close()
+		imageBytes, err := io.ReadAll(src)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"status":  "fail",
+				"message": "Failed to read file: " + err.Error(),
+			})
+		}
+		// Aquí podrías llamar a RemoveBackground si lo deseas
+		// imageBytes, _ = services.RemoveBackground(imageBytes)
+		imageURL, err = services.UploadToS3Bytes(imageBytes, key, file.Filename)
 		if err != nil {
 			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"status":  "fail",
 				"message": "Failed to upload image: " + err.Error(),
 			})
 		}
-
-		// Asignar la URL de la imagen al garment
 		garment.ImageURL = imageURL
 	}
 
-	// 4. Guardar el garment en la base de datos
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -211,7 +222,6 @@ func (h *GarmentHandler) UploadGarmentImage(ctx *fiber.Ctx) error {
 	}
 
 	file, err := ctx.FormFile("garment_image")
-
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(&fiber.Map{
 			"status":  "fail",
@@ -230,8 +240,26 @@ func (h *GarmentHandler) UploadGarmentImage(ctx *fiber.Ctx) error {
 
 	key := fmt.Sprintf("garments/%s/%s", userId.String(), file.Filename)
 
-	imageURL, err := services.UploadToS3(file, key)
+	// Leer los bytes del archivo para poder procesar si es necesario
+	src, err := file.Open()
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Failed to open file",
+		})
+	}
+	defer src.Close()
+	imageBytes, err := io.ReadAll(src)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{
+			"status":  "fail",
+			"message": "Failed to read file",
+		})
+	}
 
+	// Aquí podrías llamar a RemoveBackground si lo deseas
+	// imageBytes, _ = services.RemoveBackground(imageBytes)
+	imageURL, err := services.UploadToS3Bytes(imageBytes, key, file.Filename)
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{
 			"status":  "fail",
@@ -377,8 +405,16 @@ func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
 		})
 	}
 
+	imageBytesNoBg, err := services.RemoveBackground(imageBytes)
+	if err != nil {
+		fmt.Println("Failed to remove background, Original image will be used: ", err)
+		imageBytesNoBg = imageBytes
+	} else {
+		fmt.Println("Imagen received from RemoveBackground: ", len(imageBytesNoBg))
+	}
+
 	key := fmt.Sprintf("garments/users/%s", userId.String())
-	imageURL, err := services.UploadToS3(file, key)
+	imageURL, err := services.UploadToS3Bytes(imageBytesNoBg, key, file.Filename)
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",

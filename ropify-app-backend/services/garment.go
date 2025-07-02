@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -44,6 +45,47 @@ type ColorInfo struct {
 type Point struct {
 	X float64
 	Y float64
+}
+
+func RemoveBackground(imageBytes []byte) ([]byte, error) {
+	url := "http://background-removal-service:8000/remove-background"
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	part, err := writer.CreateFormFile("file", "garment.png")
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create form file: %v", err)
+	}
+	part.Write(imageBytes)
+	writer.Close()
+
+	req, err := http.NewRequest("POST", url, &body)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create request: %v", err)
+	}
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to remove background: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Failed to remove background code: %d", resp.StatusCode)
+	}
+
+	output, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read output image: %v", err)
+	}
+
+	return output, nil
 }
 
 func BarcodeLookup(barcode string) (*BarcodeAPIResponse, error) {

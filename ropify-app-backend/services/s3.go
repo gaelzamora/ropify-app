@@ -1,8 +1,8 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
-	"mime/multipart"
 	"os"
 	"time"
 
@@ -11,41 +11,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-func UploadToS3(file *multipart.FileHeader, destiny string) (string, error) {
-	// Crea una sesión de AWS
+func UploadToS3Bytes(imageBytes []byte, destiny, filename string) (string, error) {
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(os.Getenv("AWS_REGION")), // Región configurada en tus variables de entorno
+		Region: aws.String(os.Getenv("AWS_REGION")),
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create AWS session: %v", err)
 	}
 
-	// Abre el archivo
-	src, err := file.Open()
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %v", err)
-	}
-	defer src.Close()
-
-	// Genera un nombre único para el archivo
-	fileName := fmt.Sprintf("%s/%d-%s", destiny, time.Now().Unix(), file.Filename)
-
-	// Crea un uploader de S3
+	fileName := fmt.Sprintf("%s/%d-%s", destiny, time.Now().Unix(), filename)
 	uploader := s3manager.NewUploader(sess)
 
-	fmt.Println("Bucket Name:", os.Getenv("AWS_BUCKET_NAME"))
-	fmt.Println("AWS Region:", os.Getenv("AWS_REGION"))
-
-	// Sube el archivo a S3
 	result, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(os.Getenv("AWS_BUCKET_NAME")), // Nombre del bucket
-		Key:    aws.String(fileName),                     // Ruta del archivo en el bucket
-		Body:   src,
+		Bucket:      aws.String(os.Getenv("AWS_BUCKET_NAME")),
+		Key:         aws.String(fileName),
+		Body:        bytes.NewReader(imageBytes),
+		ContentType: aws.String("image/png"), // Cambia si usas otro formato
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file to S3: %v", err)
 	}
 
-	// Devuelve el URL público del archivo
 	return result.Location, nil
 }

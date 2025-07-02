@@ -16,6 +16,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      background-removal-service:
+        condition: service_started
     volumes:
       - .:/src/app
     command: air -c .air.toml
@@ -39,6 +41,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      
+  background-removal-service:
+    build: 
+      context: ./background-removal-service
+      dockerfile: Dockerfile
+    container_name: background-removal-service
+    ports:
+      - 8000:8000
+    networks:
+      - application
+    restart: always
+    volumes:
+      - ./background-removal-service:/app
 
 networks:
   application:
