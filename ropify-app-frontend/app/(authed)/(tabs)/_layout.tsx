@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { ComponentProps } from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, Text } from "react-native";
 
 export default function TabLayout() {
 
@@ -73,18 +73,3 @@ export default function TabLayout() {
         </>
     );
 }
-
-const styles = StyleSheet.create({
-    
-    containerIcon: {
-        height: 50,
-        width: 50,
-        alignItems: "center",
-        justifyContent: "center",
-        marginTop: 70,
-    },
-    activeIcon: {
-        backgroundColor: "#4461ed",
-        borderRadius: 40,
-    }
-});

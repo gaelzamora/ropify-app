@@ -30,12 +30,20 @@ type VisionResult struct {
 	Labels       []string
 	MainCategory string
 	Colors       []ColorInfo
+
+	ObjectMask   []byte
+	BoundingPoly []Point
 }
 
 type ColorInfo struct {
 	Name       string
 	Hex        string
 	Percentage float64
+}
+
+type Point struct {
+	X float64
+	Y float64
 }
 
 func BarcodeLookup(barcode string) (*BarcodeAPIResponse, error) {
@@ -130,6 +138,23 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		Content: imageData,
 	}
 
+	// Añadir solicitud de localización de objetos
+	req := &visionpb.AnnotateImageRequest{
+		Image: img,
+		Features: []*visionpb.Feature{
+			{Type: visionpb.Feature_LABEL_DETECTION, MaxResults: 10},
+			{Type: visionpb.Feature_IMAGE_PROPERTIES, MaxResults: 10},
+			{Type: visionpb.Feature_OBJECT_LOCALIZATION, MaxResults: 5}, // Añadido
+		},
+	}
+
+	resp, err := client.BatchAnnotateImages(ctx, &visionpb.BatchAnnotateImagesRequest{
+		Requests: []*visionpb.AnnotateImageRequest{req},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Error en la llamada a Vision API: %v", err)
+	}
+
 	labels, err := client.DetectLabels(ctx, img, nil, 10)
 	if err != nil {
 		return nil, fmt.Errorf("error al detectar etiquetas: %v", err)
@@ -198,10 +223,24 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		}
 	}
 
+	// Procesar resultados...
+	var boundingPoly []Point
+	if len(resp.Responses) > 0 && len(resp.Responses[0].LocalizedObjectAnnotations) > 0 {
+		// Buscar el objeto de ropa con mayor score
+		bestObject := resp.Responses[0].LocalizedObjectAnnotations[0]
+		for _, vertex := range bestObject.BoundingPoly.NormalizedVertices {
+			boundingPoly = append(boundingPoly, Point{
+				X: float64(vertex.X),
+				Y: float64(vertex.Y),
+			})
+		}
+	}
+
 	return &VisionResult{
 		Labels:       labelTexts,
 		MainCategory: mainCategory,
 		Colors:       colors,
+		BoundingPoly: boundingPoly,
 	}, nil
 }
 

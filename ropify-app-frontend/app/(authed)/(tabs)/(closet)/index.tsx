@@ -1,4 +1,4 @@
-import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, Button } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, Button } from "react-native";
 import React, { useCallback, useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Garment } from "@/types/garment";
@@ -8,6 +8,7 @@ import { useFocusEffect } from "expo-router";
 import Modal from 'react-native-modal'
 import * as ImagePicker from 'expo-image-picker'
 import {Camera} from 'expo-camera'
+import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
 
 const garmentCategories = [
     "all",
@@ -22,12 +23,10 @@ const garmentCategories = [
 export default function ClosetScreen() {
     const [activeClosetOption, setActiveClosetOption] = useState(garmentCategories[0])
     const [clothes, setClothes] = useState<Garment[]>([])
-    const { user } = useAuth()
     const [isLoading, setIsLoading] = useState(false)
+    const [isAnalyzing, setIsAnalyzing] = useState(true)
 
-    // Scanner
-    const [analyzing, setAnalyzing] = useState(false)
-    const [garmentData, setGarmentData] = useState<Garment>()
+    const { user } = useAuth()
 
     const [isModalActive, setIsModalActive] = useState(false)
 
@@ -44,61 +43,46 @@ export default function ClosetScreen() {
     }
 
     const takePhotoAndAnalyze = async () => {
-        const { status } = await Camera.requestCameraPermissionsAsync()
-
-        if (status !== 'granted') {
-            Alert.alert('Se requieren permisos para la camara')
-            return
-        }
-
-        let result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.5,
-        })
-
-        if (result.canceled) {
-            return
-        }
+        setIsAnalyzing(true)
 
         try {
-            setAnalyzing(true)
+            const { status } = await Camera.requestCameraPermissionsAsync()
+            if (status !== 'granted') {
+                setIsAnalyzing(false)
+                Alert.alert('Se requieren permisos para la camara')
+                return
+            }
+            const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 1,
+            })
+    
+            if (result.canceled) {
+                setIsAnalyzing(false)
+                return
+            }
             const imageUri = result.assets[0].uri
-
-            // Enviar al backend para analisis
-
             const response = await garmentService.analyzeGarmentImage(imageUri)
-
-            if (response.data && response.status === 200) {
-                const { colors, category } = response.data
-
-                if (garmentData?.id && garmentData.user_id && user) {
-                    setGarmentData({
-                        id: garmentData.id,
-                        user_id: user.id,
-                        name: garmentData?.name ?? "",
-                        brand: garmentData?.brand ?? "",
-                        size: garmentData?.size ?? "",
-                        barcode: garmentData?.barcode ?? "",
-                        is_verified: garmentData?.is_verified ?? "",
-                        category: category || garmentData?.category || "",
-                        color: colors && colors.length > 0 ? colors[0].name : garmentData?.color || "",
-                        image_url: imageUri, // Guardar URI local temporalmente
-                    })
-                }
+            
+            await fetchClothes(activeClosetOption.toLowerCase())
+            if (response.status === 200) {
+                Alert.alert('Success', 'Imagen cargada y procesada por IA')
             }
         } catch (error) {
-            console.error('Error analyzing image: ', error)
             Alert.alert('Error', 'No se pudo analizar la imagen')
+            console.log(error)
         } finally {
-            setAnalyzing(false)
+            setIsAnalyzing(false)
         }
     }
 
     useFocusEffect(useCallback(() => { fetchClothes(activeClosetOption.toLowerCase()) }, [activeClosetOption]))
 
+    
     return (
         <View style={styles.closetContainer}>
+            
             <Text style={styles.title}>Closets</Text>
             
             <View style={styles.contentArea}>
@@ -155,10 +139,21 @@ export default function ClosetScreen() {
                             <TouchableOpacity
                                 style={styles.garmentContainer}
                             >
-                                <Image 
-                                    source={{ uri: garment.image_url }}
-                                    style={styles.garmentImage}
+                                <SmartBackgroundRemoval
+                                    imageUri={garment.image_url}
+                                    boundingPoly={garment.boundingPoly}
                                 />    
+                                {garment.boundingPoly && (
+                                    <>
+                                        <View style={styles.processedBadge}>
+                                            <Text style={styles.processedText}>AI</Text>
+                                        </View>
+                                        <Text style={{ position: 'absolute', top: 5, left: 5, fontSize: 8 }}>
+                                            {JSON.stringify(garment.boundingPoly).substring(0, 20)}
+                                        </Text>
+                                    </>
+                                    
+                                )}
                             </TouchableOpacity>
                         )}
                     />
@@ -213,6 +208,12 @@ export default function ClosetScreen() {
                     <Button title="Cerrar" onPress={() => setIsModalActive(false)} />
                 </View>
             </Modal>
+
+            {isAnalyzing && (
+                <View style={styles.overlay}>
+                    <ActivityIndicator size={"large"} color={"#fff"} />
+                </View>
+            )}
         </View>
     )
 }
@@ -260,6 +261,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent', 
         alignItems: "center",
         justifyContent: "center",
+        overflow: 'hidden'
     },
     garmentImage: {
         width: '100%',
@@ -293,5 +295,30 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         height: "80%"
-    }
+    },
+    processedBadge: {
+        position: 'absolute',
+        bottom: 5,
+        right: 5,
+        backgroundColor: 'rgba(238, 30, 30, 0.8)',
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    processedText: {
+        color: 'white',
+        fontSize: 8,
+        fontWeight: 'bold',
+    },
+    overlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100,
+  },
 })

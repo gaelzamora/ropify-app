@@ -14,4 +14,5 @@ export type Garment = {
     image_url: string
     barcode: string
     is_verified: string
+    boundingPoly?: {x: number, y:number}[]
 }
