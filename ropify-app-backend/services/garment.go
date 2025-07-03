@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -287,28 +288,121 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 }
 
 func getColorName(r, g, b float32) string {
-	// Implementación básica de mapeo de colores
-	if r < 120 && g > 100 && g > r+50 && g > b+20 {
-		return "green"
-	} else if r > 200 && g < 100 && b < 100 {
-		return "red"
-	} else if r < 100 && g < 100 && b > 200 {
+	// ===== MEJORADO: Detección de blancos con tinte azul =====
+    
+    // 1. Blancos con fuerte tinte azul (como en tus ejemplos)
+    if b > 150 && r > 80 && g > 100 {
+        // Tonos azul claro que típicamente son blancos mal balanceados
+        if b-r < 120 && b-g < 80 && b > r && b > g {
+            return "white"
+        }
+    }
+    
+    // 2. Blancos estándar con variaciones mínimas
+    if r > 150 && g > 150 && b > 150 {
+        // Blancos puros o casi puros
+        if math.Abs(float64(r-g)) < 30 && math.Abs(float64(r-b)) < 50 && math.Abs(float64(g-b)) < 50 {
+            return "white"
+        }
+    }
+    
+    // 3. Caso específico para tonos azul claro/celeste que son comúnmente blancos
+    if r > 90 && g > 120 && b > 180 && b-r < 100 {
+        return "white"
+    }
+    
+    // Detectar negro
+    if r < 50 && g < 50 && b < 50 {
+        return "black"
+    }
+
+    // Calcular diferencia entre componentes para detectar grises
+    maxComponent := math.Max(float64(r), math.Max(float64(g), float64(b)))
+    minComponent := math.Min(float64(r), math.Min(float64(g), float64(b)))
+    difference := maxComponent - minComponent
+
+    // Detectar gris cuando la diferencia es pequeña
+    if difference < 40 {
+        // Es un gris con posible tinte
+        if maxComponent > 170 {
+            return "white"
+        } else if maxComponent < 80 {
+            return "dark gray"
+        } else {
+            // Si tiene un tinte azul pero sigue siendo principalmente gris
+            if b > r && b > g && float64(b)-float64(r) < 40 && float64(b)-float64(g) < 40 {
+                return "gray"  // Cambiado de "blue gray" a "gray" para ser más genérico
+            }
+            return "gray"
+        }
+    }
+
+    // Para colores más saturados, usamos ratios
+    total := r + g + b
+    if total == 0 {
+        return "black"
+    }
+
+    rRatio := r / total
+    gRatio := g / total
+    bRatio := b / total
+
+	// Azul grisáceo - específico para casos como #A6C3DB, #88A3B9
+	if b > r && b > g &&
+		b > 120 &&
+		float64(b)-float64(r) >= 20 &&
+		float64(b)-float64(g) >= 10 &&
+		float64(b)-float64(r) <= 60 {
+		return "blue gray"
+	}
+
+	// Azul marino/oscuro
+	if b > r+30 && b > g+30 && b < 130 && r < 60 && g < 60 {
+		return "navy blue"
+	}
+
+	// Azul regular
+	if bRatio > 0.40 && b > r+40 && b > g+40 {
 		return "blue"
-	} else if r > 200 && g > 200 && b < 100 {
+	}
+
+	// Azul claro
+	if b > 150 && b > r+60 && b > g+30 {
+		return "light blue"
+	}
+
+	// Verde
+	if gRatio > 0.4 && g > r+25 && g > b+25 {
+		return "green"
+	}
+
+	// Rojo
+	if rRatio > 0.4 && r > g+50 && r > b+50 {
+		return "red"
+	}
+
+	// Amarillo
+	if r > 180 && g > 150 && b < 120 && (r-b) > 70 && (g-b) > 50 {
 		return "yellow"
-	} else if r > 200 && g > 100 && b > 200 {
+	}
+
+	// Rosa
+	if r > 150 && b > 100 && r > g+40 && r > b+20 {
 		return "pink"
-	} else if r < 100 && g > 100 && b > 200 {
+	}
+
+	// Púrpura
+	if r > 80 && b > 100 && b > g+40 && r > g+20 {
 		return "purple"
-	} else if r > 200 && g > 100 && b < 100 {
+	}
+
+	// Naranja
+	if r > 180 && g > 80 && g < 180 && b < 100 && r > g+20 {
 		return "orange"
-	} else if r > 200 && g > 200 && b > 200 {
-		return "white"
-	} else if r < 100 && g < 100 && b < 100 {
-		return "black"
-	} else if r > 100 && r < 200 && g > 100 && g < 200 && b > 100 && b < 200 {
-		return "gray"
-	} else if r > 150 && g > 75 && b > 0 && b < 100 {
+	}
+
+	// Marrón
+	if r > 80 && r > g+10 && r > b+30 && g > 30 && g > b+10 {
 		return "brown"
 	}
 

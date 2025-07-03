@@ -62,7 +62,7 @@ export default function ClosetScreen() {
             const result = await ImagePicker.launchCameraAsync({
                 allowsEditing: true,
                 aspect: [4, 3],
-                quality: 1,
+                quality: 0.5,
             })
     
             if (result.canceled) {
