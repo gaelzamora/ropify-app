@@ -5,10 +5,10 @@ import { Garment } from "@/types/garment";
 import { useAuth } from "@/context/AuthContext";
 import { garmentService } from "@/services/garment";
 import { useFocusEffect } from "expo-router";
-import Modal from 'react-native-modal'
 import * as ImagePicker from 'expo-image-picker'
 import {Camera} from 'expo-camera'
 import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
+import { Image } from "react-native";
 
 const garmentCategories = [
     "all",
@@ -27,9 +27,10 @@ export default function ClosetScreen() {
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [refreshing, setRefreshing] = useState(false)
 
-    const { user } = useAuth()
+    const [elementsSelected, setElementsSelected] = useState<string[]>([])
+    const [isDeleting, setIsDeleting] = useState(false)
 
-    const [isModalActive, setIsModalActive] = useState(false)
+    const { user } = useAuth()
 
     const onRefresh = useCallback(() => {
         setRefreshing(true)
@@ -47,6 +48,18 @@ export default function ClosetScreen() {
         } finally {
             setIsLoading(false)
         }
+    }
+
+    const pushOnElementsSelected = (id: string) => {
+        if (!id) return
+
+        setElementsSelected((prevSelected: any) => {
+            if (prevSelected.includes(id)) {
+                return prevSelected.filter((item: string) => item !== id)
+            } else {
+                return [...prevSelected, id]
+            }
+        })
     }
 
     const takePhotoAndAnalyze = async () => {
@@ -86,7 +99,8 @@ export default function ClosetScreen() {
 
     useFocusEffect(useCallback(() => { fetchClothes(activeClosetOption.toLowerCase()) }, [activeClosetOption]))
 
-    
+    console.log(elementsSelected)
+
     return (
         <>
             <View style={styles.closetContainer}>
@@ -154,21 +168,23 @@ export default function ClosetScreen() {
                             renderItem={({ item: garment }) => (
                                 <TouchableOpacity
                                     style={styles.garmentContainer}
+                                    onPress={() => isDeleting ? pushOnElementsSelected(garment.id) : null}
                                 >
                                     <SmartBackgroundRemoval
                                         imageUri={garment.image_url}
                                         boundingPoly={garment.boundingPoly}
-                                    />    
-                                    {garment.boundingPoly && (
-                                        <>
-                                            <View style={styles.processedBadge}>
-                                                <Text style={styles.processedText}>AI</Text>
-                                            </View>
-                                            <Text style={{ position: 'absolute', top: 5, left: 5, fontSize: 8 }}>
-                                                {JSON.stringify(garment.boundingPoly).substring(0, 20)}
-                                            </Text>
-                                        </>
-                                        
+                                    />
+                                    {isDeleting && (
+                                        <View style={styles.overlay}>
+                                            {elementsSelected.includes(garment.id) && (
+                                                <Ionicons 
+                                                    name="checkmark-circle" 
+                                                    size={25} 
+                                                    color={"#ee1e1e"}
+                                                    style={{position: "absolute", left: 2, top: 2}}
+                                                />
+                                            )}
+                                        </View>
                                     )}
                                 </TouchableOpacity>
                             )}
@@ -201,27 +217,30 @@ export default function ClosetScreen() {
                         bottom: 15,
                     }}
                 >
+                    {elementsSelected.length > 0 && (
+                        <TouchableOpacity 
+                            style={[styles.iconTouchable, {bottom: 3}]}
+                        >
+                            <Ionicons 
+                                name="trash-outline" 
+                                size={25} 
+                                color={"white"}  
+                            />
+                        </TouchableOpacity>
+                    )}
+
                     <TouchableOpacity 
                         style={styles.iconTouchable}
-                        onPress={() => setIsModalActive(true)}    
+                        onPress={() => setIsDeleting(!isDeleting)}
                     >
-                        <FontAwesome name="plus" size={25} color={"white"}  />
+                        <Ionicons 
+                            name="ban-outline" 
+                            size={25} 
+                            color={"white"}  
+                        />
                     </TouchableOpacity>
                 </View>
-                
-                <Modal
-                    isVisible={isModalActive}
-                    onBackdropPress={() => setIsModalActive(false)}
-                    swipeDirection={"down"}
-                    onSwipeComplete={() => setIsModalActive(false)}
-                    backdropOpacity={0.6}
-                    style={styles.modal}
-                >
-                    <View style={styles.modelContent}>
-                        <Text>Este es un modal con gestos y animaciones</Text>
-                        <Button title="Cerrar" onPress={() => setIsModalActive(false)} />
-                    </View>
-                </Modal>
+            
 
             </View>
                 {isAnalyzing && (
@@ -276,12 +295,13 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent', 
         alignItems: "center",
         justifyContent: "center",
-        overflow: 'hidden'
+        overflow: 'hidden',
+        borderRadius: 15,
+        position: "relative"
     },
     garmentImage: {
         width: '100%',
         height: '100%',
-        borderRadius: 15,
         resizeMode: "cover",
         // Sombra para iOS:
         shadowColor: "#000",
@@ -326,16 +346,11 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     overlay: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        left: 0,
-        top: 0,
+        position: "absolute",
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.3)',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 100,
   },
 })
