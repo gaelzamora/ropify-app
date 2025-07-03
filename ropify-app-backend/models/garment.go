@@ -25,6 +25,7 @@ type Garment struct {
 	UserID     uuid.UUID       `json:"user_id" gorm:"type:uuid;not null"`
 	Name       string          `json:"name" gorm:"not null"`
 	Category   GarmentCategory `json:"category" gorm:"not null"`
+	Type       string          `json:"type" gorm:"not null"`
 	Color      string          `json:"color" gorm:"not null"`
 	Brand      string          `json:"brand" gorm:"not null"`
 	Size       string          `json:"size" gorm:"not null"`

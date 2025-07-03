@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -38,7 +37,6 @@ type VisionResult struct {
 }
 
 type ColorInfo struct {
-	Name       string
 	Hex        string
 	Percentage float64
 }
@@ -212,26 +210,68 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 	var mainCategory string
 
 	clothingCategories := map[string]string{
-		"shirt":      "top",
-		"t-shirt":    "top",
-		"t shirt":    "top",
-		"polo":       "top",
-		"polo shirt": "top",
-		"blouse":     "top",
-		"pants":      "bottom",
-		"jeans":      "bottom",
-		"shorts":     "bottom",
-		"skirt":      "bottom",
-		"dress":      "dress",
-		"sneakers":   "sneakers",
-		"shoes":      "sneakers",
-		"hat":        "accessories",
-		"jacket":     "top",
-		"sweater":    "top",
-		"hoodie":     "top",
-		"coat":       "top",
-		"backpack":   "backpack",
-		"bag":        "backpack",
+		"shirt":        "top",
+		"t-shirt":      "top",
+		"t shirt":      "top",
+		"polo":         "top",
+		"polo shirt":   "top",
+		"blouse":       "top",
+		"jacket":       "top",
+		"sweater":      "top",
+		"hoodie":       "top",
+		"coat":         "top",
+		"sweatshirt":   "top",
+		"jersey":       "top",
+		"cardigan":     "top",
+		"button shirt": "top",
+		"long sleeve":  "top", // Detecta prendas de manga larga
+
+		// Bottoms
+		"jean":          "bottom",
+		"pants":         "bottom",
+		"denim":         "bottom",
+		"jeans":         "bottom",
+		"shorts":        "bottom",
+		"skirt":         "bottom",
+		"trousers":      "bottom",
+		"leggings":      "bottom",
+		"sweatpants":    "bottom",
+		"jogging pants": "bottom",
+		"chinos":        "bottom",
+
+		// Dresses
+		"dress":    "dress",
+		"gown":     "dress",
+		"sundress": "dress",
+
+		// Footwear
+		"sneakers": "sneakers",
+		"shoes":    "sneakers",
+		"boots":    "sneakers",
+		"sandals":  "sneakers",
+		"footwear": "sneakers",
+
+		// Accessories
+		"hat":    "accessories",
+		"cap":    "accessories",
+		"scarf":  "accessories",
+		"gloves": "accessories",
+		"socks":  "accessories",
+		"belt":   "accessories",
+
+		// Bags
+		"backpack": "backpack",
+		"bag":      "backpack",
+		"handbag":  "backpack",
+		"tote":     "backpack",
+		"purse":    "backpack",
+		"duffel":   "backpack",
+	}
+
+	fmt.Println("========= GOOGLE VISION CATEGORIZACION ==========")
+	fmt.Println("Etiquetas detectadas: ")
+	for i, label := range labels {
+		fmt.Printf("  %d, %s (score: %.2f)\n", i+1, label.Description, label.Score)
 	}
 
 	for _, label := range labels {
@@ -261,7 +301,6 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 				Percentage: float64(colorInfo.Score),
 			}
 
-			color.Name = getColorName(c.Red, c.Green, c.Blue)
 			colors = append(colors, color)
 		}
 	}
@@ -285,126 +324,4 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		Colors:       colors,
 		BoundingPoly: boundingPoly,
 	}, nil
-}
-
-func getColorName(r, g, b float32) string {
-	// ===== MEJORADO: Detección de blancos con tinte azul =====
-    
-    // 1. Blancos con fuerte tinte azul (como en tus ejemplos)
-    if b > 150 && r > 80 && g > 100 {
-        // Tonos azul claro que típicamente son blancos mal balanceados
-        if b-r < 120 && b-g < 80 && b > r && b > g {
-            return "white"
-        }
-    }
-    
-    // 2. Blancos estándar con variaciones mínimas
-    if r > 150 && g > 150 && b > 150 {
-        // Blancos puros o casi puros
-        if math.Abs(float64(r-g)) < 30 && math.Abs(float64(r-b)) < 50 && math.Abs(float64(g-b)) < 50 {
-            return "white"
-        }
-    }
-    
-    // 3. Caso específico para tonos azul claro/celeste que son comúnmente blancos
-    if r > 90 && g > 120 && b > 180 && b-r < 100 {
-        return "white"
-    }
-    
-    // Detectar negro
-    if r < 50 && g < 50 && b < 50 {
-        return "black"
-    }
-
-    // Calcular diferencia entre componentes para detectar grises
-    maxComponent := math.Max(float64(r), math.Max(float64(g), float64(b)))
-    minComponent := math.Min(float64(r), math.Min(float64(g), float64(b)))
-    difference := maxComponent - minComponent
-
-    // Detectar gris cuando la diferencia es pequeña
-    if difference < 40 {
-        // Es un gris con posible tinte
-        if maxComponent > 170 {
-            return "white"
-        } else if maxComponent < 80 {
-            return "dark gray"
-        } else {
-            // Si tiene un tinte azul pero sigue siendo principalmente gris
-            if b > r && b > g && float64(b)-float64(r) < 40 && float64(b)-float64(g) < 40 {
-                return "gray"  // Cambiado de "blue gray" a "gray" para ser más genérico
-            }
-            return "gray"
-        }
-    }
-
-    // Para colores más saturados, usamos ratios
-    total := r + g + b
-    if total == 0 {
-        return "black"
-    }
-
-    rRatio := r / total
-    gRatio := g / total
-    bRatio := b / total
-
-	// Azul grisáceo - específico para casos como #A6C3DB, #88A3B9
-	if b > r && b > g &&
-		b > 120 &&
-		float64(b)-float64(r) >= 20 &&
-		float64(b)-float64(g) >= 10 &&
-		float64(b)-float64(r) <= 60 {
-		return "blue gray"
-	}
-
-	// Azul marino/oscuro
-	if b > r+30 && b > g+30 && b < 130 && r < 60 && g < 60 {
-		return "navy blue"
-	}
-
-	// Azul regular
-	if bRatio > 0.40 && b > r+40 && b > g+40 {
-		return "blue"
-	}
-
-	// Azul claro
-	if b > 150 && b > r+60 && b > g+30 {
-		return "light blue"
-	}
-
-	// Verde
-	if gRatio > 0.4 && g > r+25 && g > b+25 {
-		return "green"
-	}
-
-	// Rojo
-	if rRatio > 0.4 && r > g+50 && r > b+50 {
-		return "red"
-	}
-
-	// Amarillo
-	if r > 180 && g > 150 && b < 120 && (r-b) > 70 && (g-b) > 50 {
-		return "yellow"
-	}
-
-	// Rosa
-	if r > 150 && b > 100 && r > g+40 && r > b+20 {
-		return "pink"
-	}
-
-	// Púrpura
-	if r > 80 && b > 100 && b > g+40 && r > g+20 {
-		return "purple"
-	}
-
-	// Naranja
-	if r > 180 && g > 80 && g < 180 && b < 100 && r > g+20 {
-		return "orange"
-	}
-
-	// Marrón
-	if r > 80 && r > g+10 && r > b+30 && g > 30 && g > b+10 {
-		return "brown"
-	}
-
-	return "unknown"
 }

@@ -106,30 +106,62 @@ func (h *GarmentHandler) FindByBarcode(ctx *fiber.Ctx) error {
 	})
 }
 
-func (h *GarmentHandler) DeleteGarment(ctx *fiber.Ctx) error {
-	idParam := ctx.Params("id")
-	garmentID, err := uuid.Parse(idParam)
-	if err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Invalid garment ID",
-		})
-	}
+// DeleteMultipleGarments elimina varias prendas identificadas por sus IDs
+func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
+    // Estructura para el cuerpo de la petición
+    var payload struct {
+        GarmentIDs []string `json:"garment_ids"`
+    }
 
-	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+    // Parsear el cuerpo de la petición
+    if err := ctx.BodyParser(&payload); err != nil {
+        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "status":  "fail",
+            "message": "Invalid request format",
+        })
+    }
 
-	err = h.repository.DeleteGarment(context, garmentID)
-	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "fail",
-			"message": err.Error(),
-		})
-	}
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":  "success",
-		"message": "Garment deleted",
-	})
+    // Verificar que hay IDs para eliminar
+    if len(payload.GarmentIDs) == 0 {
+        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "status":  "fail",
+            "message": "No garment IDs provided",
+        })
+    }
+
+    // Crear contexto con timeout
+    context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // Variables para seguimiento de éxitos y errores
+    successCount := 0
+    failedIDs := make(map[string]string)
+
+    // Procesar cada ID
+    for _, idStr := range payload.GarmentIDs {
+        // Convertir string a UUID
+        garmentID, err := uuid.Parse(idStr)
+        if err != nil {
+            failedIDs[idStr] = "Invalid UUID format"
+            continue
+        }
+
+        // Intentar eliminar la prenda
+        err = h.repository.DeleteGarment(context, garmentID)
+        if err != nil {
+            failedIDs[idStr] = err.Error()
+        } else {
+            successCount++
+        }
+    }
+
+    // Preparar respuesta
+    return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+        "status":       "success",
+        "deleted":      successCount,
+        "total":        len(payload.GarmentIDs),
+        "failed_items": failedIDs,
+    })
 }
 
 func (h *GarmentHandler) UpdateGarment(ctx *fiber.Ctx) error {
@@ -442,7 +474,7 @@ func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
 
 	color := "unknown"
 	if len(visionResult.Colors) > 0 {
-		color = visionResult.Colors[0].Name
+		color = visionResult.Colors[0].Hex
 	}
 
 	garment := models.Garment{
@@ -492,5 +524,5 @@ func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository)
 
 	router.Patch("/:id", handler.UpdateGarment)
 
-	router.Delete("/:id", handler.DeleteGarment)
+	router.Delete("/batch", handler.DeleteMultipleGarments)
 }
