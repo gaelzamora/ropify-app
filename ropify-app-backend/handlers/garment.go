@@ -108,60 +108,60 @@ func (h *GarmentHandler) FindByBarcode(ctx *fiber.Ctx) error {
 
 // DeleteMultipleGarments elimina varias prendas identificadas por sus IDs
 func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
-    // Estructura para el cuerpo de la petición
-    var payload struct {
-        GarmentIDs []string `json:"garment_ids"`
-    }
+	// Estructura para el cuerpo de la petición
+	var payload struct {
+		GarmentIDs []string `json:"garment_ids"`
+	}
 
-    // Parsear el cuerpo de la petición
-    if err := ctx.BodyParser(&payload); err != nil {
-        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "status":  "fail",
-            "message": "Invalid request format",
-        })
-    }
+	// Parsear el cuerpo de la petición
+	if err := ctx.BodyParser(&payload); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid request format",
+		})
+	}
 
-    // Verificar que hay IDs para eliminar
-    if len(payload.GarmentIDs) == 0 {
-        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "status":  "fail",
-            "message": "No garment IDs provided",
-        })
-    }
+	// Verificar que hay IDs para eliminar
+	if len(payload.GarmentIDs) == 0 {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "No garment IDs provided",
+		})
+	}
 
-    // Crear contexto con timeout
-    context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	// Crear contexto con timeout
+	context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    // Variables para seguimiento de éxitos y errores
-    successCount := 0
-    failedIDs := make(map[string]string)
+	// Variables para seguimiento de éxitos y errores
+	successCount := 0
+	failedIDs := make(map[string]string)
 
-    // Procesar cada ID
-    for _, idStr := range payload.GarmentIDs {
-        // Convertir string a UUID
-        garmentID, err := uuid.Parse(idStr)
-        if err != nil {
-            failedIDs[idStr] = "Invalid UUID format"
-            continue
-        }
+	// Procesar cada ID
+	for _, idStr := range payload.GarmentIDs {
+		// Convertir string a UUID
+		garmentID, err := uuid.Parse(idStr)
+		if err != nil {
+			failedIDs[idStr] = "Invalid UUID format"
+			continue
+		}
 
-        // Intentar eliminar la prenda
-        err = h.repository.DeleteGarment(context, garmentID)
-        if err != nil {
-            failedIDs[idStr] = err.Error()
-        } else {
-            successCount++
-        }
-    }
+		// Intentar eliminar la prenda
+		err = h.repository.DeleteGarment(context, garmentID)
+		if err != nil {
+			failedIDs[idStr] = err.Error()
+		} else {
+			successCount++
+		}
+	}
 
-    // Preparar respuesta
-    return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-        "status":       "success",
-        "deleted":      successCount,
-        "total":        len(payload.GarmentIDs),
-        "failed_items": failedIDs,
-    })
+	// Preparar respuesta
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":       "success",
+		"deleted":      successCount,
+		"total":        len(payload.GarmentIDs),
+		"failed_items": failedIDs,
+	})
 }
 
 func (h *GarmentHandler) UpdateGarment(ctx *fiber.Ctx) error {
@@ -364,13 +364,9 @@ func (h *GarmentHandler) LookupByBarcode(ctx *fiber.Ctx) error {
 	garment := models.Garment{
 		ID:         uuid.New(),
 		UserID:     userId,
-		Name:       productData.ProductName,
 		Category:   category,
 		Color:      productData.Color,
-		Brand:      productData.Brand,
-		Size:       productData.Size,
 		ImageURL:   productData.ImageURL,
-		Barcode:    productData.Barcode,
 		IsVerified: true, // Asumimos que los productos de la API son verificados
 		CreatedAt:  time.Now(),
 	}
@@ -479,11 +475,9 @@ func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
 
 	garment := models.Garment{
 		UserID:     userId,
-		Name:       fmt.Sprintf("%s %s", color, visionResult.MainCategory),
 		Category:   category,
 		Color:      color,
-		Brand:      "", // Podría ser completado por el usuario después
-		Size:       "", // Podría ser completado por el usuario después
+		Labels:     visionResult.Labels,
 		ImageURL:   imageURL,
 		IsVerified: true,
 		CreatedAt:  time.Now(),

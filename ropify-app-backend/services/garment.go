@@ -268,12 +268,6 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"duffel":   "backpack",
 	}
 
-	fmt.Println("========= GOOGLE VISION CATEGORIZACION ==========")
-	fmt.Println("Etiquetas detectadas: ")
-	for i, label := range labels {
-		fmt.Printf("  %d, %s (score: %.2f)\n", i+1, label.Description, label.Score)
-	}
-
 	for _, label := range labels {
 		labelTexts = append(labelTexts, label.Description)
 

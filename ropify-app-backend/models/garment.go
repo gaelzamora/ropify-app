@@ -2,6 +2,9 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,17 +23,34 @@ const (
 	Unknown    GarmentCategory = "unknown"
 )
 
+type StringArray []string
+
+// Scan implementa la interfaz sql.Scanner
+func (sa *StringArray) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("failed to unmarshal StringArray value")
+	}
+
+	return json.Unmarshal(bytes, sa)
+}
+
+// Value implementa la interfaz driver.Valuer
+func (sa StringArray) Value() (driver.Value, error) {
+	if sa == nil {
+		return nil, nil
+	}
+
+	return json.Marshal(sa)
+}
+
 type Garment struct {
 	ID         uuid.UUID       `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
 	UserID     uuid.UUID       `json:"user_id" gorm:"type:uuid;not null"`
-	Name       string          `json:"name" gorm:"not null"`
 	Category   GarmentCategory `json:"category" gorm:"not null"`
-	Type       string          `json:"type" gorm:"not null"`
 	Color      string          `json:"color" gorm:"not null"`
-	Brand      string          `json:"brand" gorm:"not null"`
-	Size       string          `json:"size" gorm:"not null"`
+	Labels     StringArray     `json:"labels" gorm:"type:jsonb"`
 	ImageURL   string          `json:"image_url"`
-	Barcode    *string         `json:"barcode"`
 	IsVerified bool            `json:"is_verified"`
 	CreatedAt  time.Time       `json:"created_at"`
 }
