@@ -66,6 +66,16 @@ func (r *GarmentRepository) FilterGarments(ctx context.Context, userID uuid.UUID
 	return garments, nil
 }
 
+func (r *GarmentRepository) GetGarmentImageURL(ctx context.Context, garmentID uuid.UUID) (string, error) {
+	var garment models.Garment
+
+	if err := r.db.WithContext(ctx).Select("image_url").First(&garment, "id = ?", garmentID).Error; err != nil {
+		return "", err
+	}
+
+	return garment.ImageURL, nil
+}
+
 func (r *GarmentRepository) UpdateGarmentImage(userId uuid.UUID, imageURL string, garmentId uuid.UUID) error {
 	return r.db.Model(&models.Garment{}).
 		Where("id = ? AND user_id = ?", garmentId, userId).

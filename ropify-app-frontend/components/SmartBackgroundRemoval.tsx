@@ -1,7 +1,6 @@
-// components/SmartBackgroundRemoval.tsx
-import React from 'react';
-import { View, Image, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Path, Defs, ClipPath, Rect } from 'react-native-svg';
+import React, { useState } from 'react';
+import { View, Image, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import * as SvgComponent from 'react-native-svg';
 
 type Point = {x: number, y: number};
 
@@ -11,12 +10,26 @@ type Props = {
 };
 
 const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  
   // Si no hay datos de segmentación, usar el componente simple
   if (!boundingPoly || boundingPoly.length < 3) {
     return (
       <View style={styles.container}>
         <View style={styles.whiteBackground} />
-        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
+        {isLoading && (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="small" color="#ee1e1e" />
+          </View>
+        )}
+        <Image 
+          source={{ uri: imageUri }} 
+          style={styles.image} 
+          resizeMode="contain"
+          onLoadStart={() => setIsLoading(true)}
+          onLoad={() => setIsLoading(false)}
+          onLoadEnd={() => setIsLoading(false)}
+        />
       </View>
     );
   }
@@ -38,19 +51,31 @@ const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly }) => 
     <View style={styles.container}>
       <View style={styles.whiteBackground} />
       
+      {isLoading && (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="small" color="#ee1e1e" />
+        </View>
+      )}
+      
       {/* Imagen original */}
-      <Image source={{ uri: imageUri }} style={styles.image} />
+      <Image 
+        source={{ uri: imageUri }} 
+        style={styles.image}
+        onLoadStart={() => setIsLoading(true)}
+        onLoad={() => setIsLoading(false)}
+        onLoadEnd={() => setIsLoading(false)}
+      />
       
       {/* SVG con clip path */}
       <View style={StyleSheet.absoluteFill}>
-        <Svg height={height} width={width}>
-          <Defs>
-            <ClipPath id="clip">
-              <Path d={svgPath} />
-            </ClipPath>
-          </Defs>
+        <SvgComponent.Svg height={height} width={width}>
+          <SvgComponent.Defs>
+            <SvgComponent.ClipPath id="clip">
+              <SvgComponent.Path d={svgPath} />
+            </SvgComponent.ClipPath>
+          </SvgComponent.Defs>
           
-          <Rect
+          <SvgComponent.Rect
             x="0"
             y="0"
             width={width}
@@ -58,7 +83,7 @@ const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly }) => 
             fill="white"
             clipPath="url(#clip)"
           />
-        </Svg>
+        </SvgComponent.Svg>
       </View>
     </View>
   );
@@ -80,6 +105,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  loaderContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  }
 });
 
 export default SmartBackgroundRemoval;

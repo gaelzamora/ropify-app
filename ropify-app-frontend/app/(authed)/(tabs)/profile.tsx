@@ -8,10 +8,15 @@ export default function ProfileScreen() {
     return (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <TouchableOpacity
-                style={{ backgroundColor: "#888", paddingVertical: 5, paddingHorizontal: 15 }}
+                style={{ 
+                    backgroundColor: "#d85858", 
+                    paddingVertical: 15, 
+                    paddingHorizontal: 35,
+                    borderRadius: 10
+                }}
                 onPress={logout}
             >
-                <Text>Logout</Text>
+                <Text style={{ color: "white", fontWeight: "700" }}>Logout</Text>
             </TouchableOpacity>
         </View>
     )

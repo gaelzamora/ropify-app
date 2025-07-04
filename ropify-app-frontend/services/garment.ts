@@ -38,7 +38,14 @@ async function analyzeGarmentImage(imageUri: string) {
   });
 }
 
+async function deleteMultipleGarments(garment_ids: string[]) {
+  return Api.delete('/garment/batch', { 
+    data: { garment_ids: garment_ids }
+   });
+}
+
 export const garmentService = {
     filterGarments,
-    analyzeGarmentImage
+    analyzeGarmentImage,
+    deleteMultipleGarments,
 }

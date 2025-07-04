@@ -2,14 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { ComponentProps } from "react";
 import { View, Text } from "react-native";
-import Icon from 'react-native-vector-icons/Ionicons'
 
 export default function TabLayout() {
 
     const tabs = [
         {
             name: "(feed)",
-            displayName: "Home",
+            displayName: "Feed",
             icon: "flame-outline",
         },
         {

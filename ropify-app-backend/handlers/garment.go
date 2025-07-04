@@ -106,62 +106,79 @@ func (h *GarmentHandler) FindByBarcode(ctx *fiber.Ctx) error {
 	})
 }
 
-// DeleteMultipleGarments elimina varias prendas identificadas por sus IDs
 func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
-    // Estructura para el cuerpo de la petición
-    var payload struct {
-        GarmentIDs []string `json:"garment_ids"`
-    }
+	// Estructura para el cuerpo de la petición
+	var payload struct {
+		GarmentIDs []string `json:"garment_ids"`
+	}
 
-    // Parsear el cuerpo de la petición
-    if err := ctx.BodyParser(&payload); err != nil {
-        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "status":  "fail",
-            "message": "Invalid request format",
-        })
-    }
+	// Parsear el cuerpo de la petición
+	if err := ctx.BodyParser(&payload); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid request format",
+		})
+	}
 
-    // Verificar que hay IDs para eliminar
-    if len(payload.GarmentIDs) == 0 {
-        return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "status":  "fail",
-            "message": "No garment IDs provided",
-        })
-    }
+	// Verificar que hay IDs para eliminar
+	if len(payload.GarmentIDs) == 0 {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "No garment IDs provided",
+		})
+	}
 
-    // Crear contexto con timeout
-    context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	// Crear contexto con timeout
+	context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    // Variables para seguimiento de éxitos y errores
-    successCount := 0
-    failedIDs := make(map[string]string)
+	// Variables para seguimiento de éxitos y errores
+	successCount := 0
+	failedIDs := make(map[string]string)
+	imageDeleteErrors := 0
 
-    // Procesar cada ID
-    for _, idStr := range payload.GarmentIDs {
-        // Convertir string a UUID
-        garmentID, err := uuid.Parse(idStr)
-        if err != nil {
-            failedIDs[idStr] = "Invalid UUID format"
-            continue
-        }
+	// Procesar cada ID
+	for _, idStr := range payload.GarmentIDs {
+		// Convertir string a UUID
+		garmentID, err := uuid.Parse(idStr)
+		if err != nil {
+			failedIDs[idStr] = "Invalid UUID format"
+			continue
+		}
 
-        // Intentar eliminar la prenda
-        err = h.repository.DeleteGarment(context, garmentID)
-        if err != nil {
-            failedIDs[idStr] = err.Error()
-        } else {
-            successCount++
-        }
-    }
+		// Primero, obtener la URL de la imagen
+		imageURL, err := h.repository.GetGarmentImageURL(context, garmentID)
+		if err == nil && imageURL != "" {
+			// Extraer clave de S3 de la URL
+			s3Key, err := services.ExtractS3KeyFromURL(imageURL)
+			if err == nil {
+				// Intentar eliminar la imagen de S3
+				err = services.DeleteFromS3(s3Key)
+				if err != nil {
+					// Registrar el error pero continuar con la eliminación de la prenda
+					fmt.Printf("Error deleting image from S3: %v\n", err)
+					imageDeleteErrors++
+				}
+			}
+		}
 
-    // Preparar respuesta
-    return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-        "status":       "success",
-        "deleted":      successCount,
-        "total":        len(payload.GarmentIDs),
-        "failed_items": failedIDs,
-    })
+		// Intentar eliminar la prenda de la base de datos
+		err = h.repository.DeleteGarment(context, garmentID)
+		if err != nil {
+			failedIDs[idStr] = err.Error()
+		} else {
+			successCount++
+		}
+	}
+
+	// Preparar respuesta
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":              "success",
+		"deleted":             successCount,
+		"total":               len(payload.GarmentIDs),
+		"failed_items":        failedIDs,
+		"image_delete_errors": imageDeleteErrors,
+	})
 }
 
 func (h *GarmentHandler) UpdateGarment(ctx *fiber.Ctx) error {

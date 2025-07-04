@@ -1,5 +1,5 @@
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, Button, RefreshControl } from "react-native";
-import React, { useCallback, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from "react-native";
+import React, { isValidElement, useCallback, useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Garment } from "@/types/garment";
 import { useAuth } from "@/context/AuthContext";
@@ -8,7 +8,6 @@ import { useFocusEffect } from "expo-router";
 import * as ImagePicker from 'expo-image-picker'
 import {Camera} from 'expo-camera'
 import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
-import { Image } from "react-native";
 
 const garmentCategories = [
     "all",
@@ -47,6 +46,18 @@ export default function ClosetScreen() {
             Alert.alert("Error: ", String(error))
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const fetchDeleteGarments = async (garments: string[]) => {
+        try {
+            await garmentService.deleteMultipleGarments(garments)
+
+            setElementsSelected([])
+
+            await fetchClothes(activeClosetOption.toLowerCase())
+        } catch (error) {
+            Alert.alert("Error: ", String(error))
         }
     }
 
@@ -98,8 +109,6 @@ export default function ClosetScreen() {
     }
 
     useFocusEffect(useCallback(() => { fetchClothes(activeClosetOption.toLowerCase()) }, [activeClosetOption]))
-
-    console.log(elementsSelected)
 
     return (
         <>
@@ -220,6 +229,7 @@ export default function ClosetScreen() {
                     {elementsSelected.length > 0 && (
                         <TouchableOpacity 
                             style={[styles.iconTouchable, {bottom: 3}]}
+                            onPress={() => fetchDeleteGarments(elementsSelected)}
                         >
                             <Ionicons 
                                 name="trash-outline" 
@@ -230,13 +240,16 @@ export default function ClosetScreen() {
                     )}
 
                     <TouchableOpacity 
-                        style={styles.iconTouchable}
-                        onPress={() => setIsDeleting(!isDeleting)}
+                        style={[styles.iconTouchable, isDeleting ? {backgroundColor: "white"} : {}]}
+                        onPress={() => {
+                            if (isDeleting) setElementsSelected([])
+                            setIsDeleting(!isDeleting)}
+                        }   
                     >
                         <Ionicons 
                             name="ban-outline" 
                             size={25} 
-                            color={"white"}  
+                            color={isDeleting ? "#e75959" : "white"}  
                         />
                     </TouchableOpacity>
                 </View>
