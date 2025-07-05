@@ -1,5 +1,5 @@
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from "react-native";
-import React, { isValidElement, useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Garment } from "@/types/garment";
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +8,8 @@ import { useFocusEffect } from "expo-router";
 import * as ImagePicker from 'expo-image-picker'
 import {Camera} from 'expo-camera'
 import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
+import Modal from 'react-native-modal'
+import { Image } from 'expo-image'
 
 const garmentCategories = [
     "all",
@@ -28,6 +30,9 @@ export default function ClosetScreen() {
 
     const [elementsSelected, setElementsSelected] = useState<string[]>([])
     const [isDeleting, setIsDeleting] = useState(false)
+
+    const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null)
+    const [isOpenGarment, setIsOpenGarment] = useState(false)
 
     const { user } = useAuth()
 
@@ -177,7 +182,15 @@ export default function ClosetScreen() {
                             renderItem={({ item: garment }) => (
                                 <TouchableOpacity
                                     style={styles.garmentContainer}
-                                    onPress={() => isDeleting ? pushOnElementsSelected(garment.id) : null}
+                                    onPress={() => {
+                                        if (isDeleting) {
+                                            pushOnElementsSelected(garment.id)
+                                        } else {
+                                           setSelectedGarment(garment)
+                                           setIsOpenGarment(true)
+                                        }
+                                    } 
+                                }
                                 >
                                     <SmartBackgroundRemoval
                                         imageUri={garment.image_url}
@@ -211,7 +224,7 @@ export default function ClosetScreen() {
                         style={styles.iconTouchable}
                         onPress={takePhotoAndAnalyze}
                     >
-                        <Ionicons
+                        <Ionicons   
                             name={"scan"}
                             size={28}
                             color={"white"}
@@ -249,7 +262,7 @@ export default function ClosetScreen() {
                         <Ionicons 
                             name="ban-outline" 
                             size={25} 
-                            color={isDeleting ? "#e75959" : "white"}  
+                            color={isDeleting ? "#222" : "white"}  
                         />
                     </TouchableOpacity>
                 </View>
@@ -261,6 +274,50 @@ export default function ClosetScreen() {
                         <ActivityIndicator size={"large"} color={"#fff"} />
                     </View>
                 )}
+
+            <Modal
+                isVisible={isOpenGarment}
+                onBackdropPress={() => {
+                    setIsOpenGarment(false);
+                    setTimeout(() => setSelectedGarment(null), 300);
+                }}
+                onSwipeComplete={() => {
+                    setIsOpenGarment(false);
+                    setTimeout(() => setSelectedGarment(null), 300);
+                }}
+                swipeDirection={['down']}
+                backdropOpacity={0.7}
+                animationIn="zoomIn"
+                animationOut="zoomOut"
+                animationInTiming={300}
+                animationOutTiming={300}
+                style={styles.modal}
+            >
+                <View style={styles.modalContent}>
+                    {selectedGarment && (
+                        <>
+                            <TouchableOpacity 
+                                style={styles.closeButton} 
+                                onPress={() => {
+                                    setIsOpenGarment(false);
+                                    setTimeout(() => setSelectedGarment(null), 300);
+                                }}
+                            >
+                                <Ionicons name="close" size={24} color="#fff" />
+                            </TouchableOpacity>
+                            
+                            <View style={styles.garmentImageContainer}>
+                                <Image
+                                    source={selectedGarment.image_url}
+                                    style={{ width: '100%', height: 300, borderRadius: 10 }}
+                                    contentFit="contain"
+                                    transition={300}
+                                />
+                            </View>
+                        </>
+                    )}
+                </View>
+            </Modal>
         </>
     )
 }
@@ -298,7 +355,7 @@ const styles = StyleSheet.create({
         height: 50,
     },
     itemActive: {
-        borderColor: "#ee1e1e",
+        borderColor: "#353333",
         borderBottomWidth: 3
     },
     garmentContainer: {
@@ -325,17 +382,13 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     iconTouchable: {
-        backgroundColor: "#e75959", 
+        backgroundColor: "#353333", 
         width: 50, 
         height: 50, 
         flex: 1, 
         alignItems: "center", 
         justifyContent: "center",
         borderRadius: 99
-    },
-    modal: {
-        justifyContent: 'flex-end',
-        margin: 0
     },
     modelContent: {
         backgroundColor:"white",
@@ -365,5 +418,57 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.3)',
         alignItems: 'center',
         justifyContent: 'center',
-  },
+    },
+    modal: {
+        margin: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderRadius: 15,
+        padding: 20,
+        width: '85%',
+        maxHeight: '80%',
+        alignItems: 'center',
+    },
+    closeButton: {
+        position: 'absolute',
+        top: -10,
+        right: -10,
+        backgroundColor: '#222',
+        borderRadius: 15,
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    garmentImageContainer: {
+        width: '100%',
+        height: 300,
+        marginBottom: 20,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    garmentDetails: {
+        width: '100%',
+        padding: 10,
+    },
+    garmentName: {
+        fontSize: 22,
+        fontWeight: '700',
+        marginBottom: 8,
+        color: '#222',
+    },
+    garmentCategory: {
+        fontSize: 16,
+        color: '#666',
+        marginBottom: 5,
+    },
+    garmentInfo: {
+        fontSize: 14,
+        color: '#777',
+        marginBottom: 3,
+    },
 })

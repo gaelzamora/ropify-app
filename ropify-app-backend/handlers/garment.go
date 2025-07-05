@@ -135,11 +135,7 @@ func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
 	// Variables para seguimiento de éxitos y errores
 	successCount := 0
 	failedIDs := make(map[string]string)
-<<<<<<< HEAD
 	imageDeleteErrors := 0
-=======
->>>>>>> 046b4fcd0e516fdd401dbf18e90f76074a530a5d
-
 	// Procesar cada ID
 	for _, idStr := range payload.GarmentIDs {
 		// Convertir string a UUID
@@ -149,7 +145,6 @@ func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
 			continue
 		}
 
-<<<<<<< HEAD
 		// Primero, obtener la URL de la imagen
 		imageURL, err := h.repository.GetGarmentImageURL(context, garmentID)
 		if err == nil && imageURL != "" {
@@ -177,28 +172,10 @@ func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
 
 	// Preparar respuesta
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":              "success",
-		"deleted":             successCount,
-		"total":               len(payload.GarmentIDs),
-		"failed_items":        failedIDs,
-		"image_delete_errors": imageDeleteErrors,
-=======
-		// Intentar eliminar la prenda
-		err = h.repository.DeleteGarment(context, garmentID)
-		if err != nil {
-			failedIDs[idStr] = err.Error()
-		} else {
-			successCount++
-		}
-	}
-
-	// Preparar respuesta
-	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"status":       "success",
 		"deleted":      successCount,
 		"total":        len(payload.GarmentIDs),
 		"failed_items": failedIDs,
->>>>>>> 046b4fcd0e516fdd401dbf18e90f76074a530a5d
 	})
 }
 

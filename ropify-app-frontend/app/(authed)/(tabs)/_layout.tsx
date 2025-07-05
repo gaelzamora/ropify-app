@@ -9,22 +9,22 @@ export default function TabLayout() {
         {
             name: "(feed)",
             displayName: "Feed",
-            icon: "flame-outline",
+            icon: "flame",
         },
         {
             name: "(closet)",
             displayName: "Closet",
-            icon: "pricetag-outline",
+            icon: "pricetag",
         },
         {
             name: "(outfit)",
             displayName: "Outfit",
-            icon: "shirt-outline",
+            icon: "shirt",
         },
         {
             name: "profile",
             displayName: "Profile",
-            icon: "settings-outline",
+            icon: "settings",
         },
     ];  
 
@@ -49,23 +49,27 @@ export default function TabLayout() {
                         name={tab.name}
                         options={{
                             tabBarLabel: () => null, 
-                            tabBarIcon: ({ focused }) => (
-                                <View style={{ alignItems: "center", justifyContent: "center", width: 100 }}>
-                                    <Ionicons
-                                        name={tab.icon as ComponentProps<typeof Ionicons>["name"]}
-                                        size={28}
-                                        color={focused ? "#e85a5a" : "#949598"}
-                                    />
-                                    <Text style={{
-                                        fontSize: 12,
-                                        marginTop: 4,
-                                        fontWeight: "500",
-                                        color: focused ? "#e85a5a" : "#949598"
-                                    }}>
-                                        {tab.displayName}
-                                    </Text>
-                                </View>
-                            ),
+                            tabBarIcon: ({ focused }) => {
+                                // Si el icono tiene versión outline, la usamos cuando no está enfocado
+                                const iconName = focused ? tab.icon : `${tab.icon}-outline`;
+                                return (
+                                    <View style={{ alignItems: "center", justifyContent: "center", width: 100 }}>
+                                        <Ionicons
+                                            name={iconName as ComponentProps<typeof Ionicons>["name"]}
+                                            size={28}
+                                            color={focused ? "#000" : "#888"}
+                                        />
+                                        <Text style={{
+                                            fontSize: 12,
+                                            marginTop: 4,
+                                            fontWeight: "500",
+                                            color: focused ? "#000" : "#888"
+                                        }}>
+                                            {tab.displayName}
+                                        </Text>
+                                    </View>
+                                );
+                            },
                         }}
                     />
                 ))}

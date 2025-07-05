@@ -6,13 +6,10 @@ export type GarmentListResponse = ApiResponse<Garment[]>
 export type Garment = {
     id: string
     user_id: string
-    name: string
     category: string
     color: string
-    brand: string
-    size: string
+    labels: string[]
     image_url: string
-    barcode: string
     is_verified: string
     boundingPoly?: {x: number, y:number}[]
 }
