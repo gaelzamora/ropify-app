@@ -135,7 +135,10 @@ func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
 	// Variables para seguimiento de éxitos y errores
 	successCount := 0
 	failedIDs := make(map[string]string)
+<<<<<<< HEAD
 	imageDeleteErrors := 0
+=======
+>>>>>>> 046b4fcd0e516fdd401dbf18e90f76074a530a5d
 
 	// Procesar cada ID
 	for _, idStr := range payload.GarmentIDs {
@@ -146,6 +149,7 @@ func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
 			continue
 		}
 
+<<<<<<< HEAD
 		// Primero, obtener la URL de la imagen
 		imageURL, err := h.repository.GetGarmentImageURL(context, garmentID)
 		if err == nil && imageURL != "" {
@@ -178,6 +182,23 @@ func (h *GarmentHandler) DeleteMultipleGarments(ctx *fiber.Ctx) error {
 		"total":               len(payload.GarmentIDs),
 		"failed_items":        failedIDs,
 		"image_delete_errors": imageDeleteErrors,
+=======
+		// Intentar eliminar la prenda
+		err = h.repository.DeleteGarment(context, garmentID)
+		if err != nil {
+			failedIDs[idStr] = err.Error()
+		} else {
+			successCount++
+		}
+	}
+
+	// Preparar respuesta
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":       "success",
+		"deleted":      successCount,
+		"total":        len(payload.GarmentIDs),
+		"failed_items": failedIDs,
+>>>>>>> 046b4fcd0e516fdd401dbf18e90f76074a530a5d
 	})
 }
 
@@ -381,13 +402,9 @@ func (h *GarmentHandler) LookupByBarcode(ctx *fiber.Ctx) error {
 	garment := models.Garment{
 		ID:         uuid.New(),
 		UserID:     userId,
-		Name:       productData.ProductName,
 		Category:   category,
 		Color:      productData.Color,
-		Brand:      productData.Brand,
-		Size:       productData.Size,
 		ImageURL:   productData.ImageURL,
-		Barcode:    productData.Barcode,
 		IsVerified: true, // Asumimos que los productos de la API son verificados
 		CreatedAt:  time.Now(),
 	}
@@ -496,11 +513,9 @@ func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
 
 	garment := models.Garment{
 		UserID:     userId,
-		Name:       fmt.Sprintf("%s %s", color, visionResult.MainCategory),
 		Category:   category,
 		Color:      color,
-		Brand:      "", // Podría ser completado por el usuario después
-		Size:       "", // Podría ser completado por el usuario después
+		Labels:     visionResult.Labels,
 		ImageURL:   imageURL,
 		IsVerified: true,
 		CreatedAt:  time.Now(),
