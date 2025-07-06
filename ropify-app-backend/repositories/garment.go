@@ -82,6 +82,18 @@ func (r *GarmentRepository) UpdateGarmentImage(userId uuid.UUID, imageURL string
 		Update("image_url", imageURL).Error
 }
 
+func (r *GarmentRepository) GetGarmentsByCategory(ctx context.Context, userID uuid.UUID, category string, limit int) ([]*models.Garment, error) {
+	garments := []*models.Garment{}
+	query := r.db.WithContext(ctx).Where("user_id = ? AND category = ?", userID, category).Limit(limit)
+	res := query.Find(&garments)
+
+	if res.Error != nil {
+		return nil, res.Error
+	}
+
+	return garments, nil
+}
+
 func NewGarmentRepository(db *gorm.DB) models.GarmentRepository {
 	return &GarmentRepository{
 		db: db,

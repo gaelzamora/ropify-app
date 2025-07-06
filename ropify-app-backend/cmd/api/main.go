@@ -49,7 +49,7 @@ func main() {
 	privateRoutes := server.Use(middlewares.AuthProtected(db))
 
 	handlers.NewGarmentHandler(privateRoutes.Group("/garment"), garmentRepository)
-	handlers.NewOutfitHandler(privateRoutes.Group("/outfit"), outfitRepository)
+	handlers.NewOutfitHandler(privateRoutes.Group("/outfit"), outfitRepository, garmentRepository)
 
 	app.Listen(fmt.Sprintf("0.0.0.0:" + envConfig.ServerPort))
 }

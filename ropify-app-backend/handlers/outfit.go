@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
+	"github.com/gaelzamora/ropify-app/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
 type OutfitHandler struct {
-	repository models.OutfitRepository
+	repository      models.OutfitRepository
+	outfitGenerator *services.OutfitGeneratorService
 }
 
 // Crear outfit
@@ -211,15 +213,67 @@ func (h *OutfitHandler) GetOutfitsByUser(ctx *fiber.Ctx) error {
 	})
 }
 
-func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository) {
+func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
+	userIDStr := ctx.Locals("userId").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid user ID",
+		})
+	}
+
+	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	outfit, garments, err := h.outfitGenerator.GenerateRandomOutfit(context, userID)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": err.Error(),
+		})
+	}
+
+	if ctx.Query("save", "false") == "true" {
+		savedOutfit, err := h.repository.AddOutfit(context, outfit)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"status":  "partial_success",
+				"message": "Outfit generated but not saved",
+				"data": fiber.Map{
+					"outfit":   outfit,
+					"garments": garments,
+				},
+			})
+		}
+		outfit = savedOutfit
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status": "success",
+		"data": fiber.Map{
+			"outfit":   outfit,
+			"garments": garments,
+		},
+	})
+}
+
+func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository, garmentRepository models.GarmentRepository) {
+	outfitGenerator := services.NewOutfitGeneratorService(garmentRepository)
+
 	handler := &OutfitHandler{
-		repository: repository,
+		repository:      repository,
+		outfitGenerator: outfitGenerator,
 	}
 
 	router.Post("/", handler.CreateOutfit)
+
 	router.Patch("/:id", handler.UpdateOutfit)
 	router.Patch("/:id/archive", handler.ArchiveOutfit)
+
 	router.Get("/", handler.GetOutfitsByUser)
+	router.Get("/generate", handler.GenerateRandomOutfit)
 	router.Get("/:id", handler.GetOutfit)
-	router.Delete("/:id", handler.DeleteOutfit)	
+
+	router.Delete("/:id", handler.DeleteOutfit)
 }

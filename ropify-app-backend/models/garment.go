@@ -68,6 +68,8 @@ type GarmentRepository interface {
 	UpdateGarmentImage(userId uuid.UUID, imageURL string, garmentId uuid.UUID) error
 
 	GetGarmentImageURL(ctx context.Context, garmentID uuid.UUID) (string, error)
+
+	GetGarmentsByCategory(ctx context.Context, userID uuid.UUID, category string, limit int) ([]*Garment, error)
 }
 
 func (g *Garment) BeforeCreate(tx *gorm.DB) (err error) {
