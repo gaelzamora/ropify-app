@@ -9,7 +9,7 @@ export default function ProfileScreen() {
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <TouchableOpacity
                 style={{ 
-                    backgroundColor: "#d85858", 
+                    backgroundColor: "#222", 
                     paddingVertical: 15, 
                     paddingHorizontal: 35,
                     borderRadius: 10

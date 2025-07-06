@@ -252,19 +252,22 @@ export default function ClosetScreen() {
                         </TouchableOpacity>
                     )}
 
-                    <TouchableOpacity 
-                        style={[styles.iconTouchable, isDeleting ? {backgroundColor: "white"} : {}]}
-                        onPress={() => {
-                            if (isDeleting) setElementsSelected([])
-                            setIsDeleting(!isDeleting)}
-                        }   
-                    >
-                        <Ionicons 
-                            name="ban-outline" 
-                            size={25} 
-                            color={isDeleting ? "#222" : "white"}  
-                        />
-                    </TouchableOpacity>
+                    {clothes.length > 0 && (
+                        <TouchableOpacity 
+                            style={[styles.iconTouchable, isDeleting ? {backgroundColor: "white"} : {}]}
+                            onPress={() => {
+                                if (isDeleting) setElementsSelected([])
+                                setIsDeleting(!isDeleting)}
+                            }   
+                        >
+                            <Ionicons 
+                                name="ban-outline" 
+                                size={25} 
+                                color={isDeleting ? "#222" : "white"}  
+                            />
+                        </TouchableOpacity>
+                    )}
+
                 </View>
             
 
