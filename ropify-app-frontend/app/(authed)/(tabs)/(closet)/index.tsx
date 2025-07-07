@@ -1,5 +1,5 @@
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from "react-native";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Garment } from "@/types/garment";
 import { useAuth } from "@/context/AuthContext";
@@ -54,7 +54,6 @@ export default function ClosetScreen() {
             setIsLoading(false)
         }
     }
-
 
     const fetchDeleteGarments = async (garments: string[]) => {
         try {
@@ -156,7 +155,6 @@ export default function ClosetScreen() {
                             keyExtractor={(item) => item.id.toString()}
                             numColumns={3}
                             contentContainerStyle={{
-                                flex: 1,
                                 alignContent: "center",
                                 justifyContent: 'flex-start',
                                 width: "100%"
@@ -175,7 +173,7 @@ export default function ClosetScreen() {
                                         <ActivityIndicator size="large" color="#ee1e1e" />
                                     </View>
                                 ) : (
-                                    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 40 }}>
+                                    <View style={{ flex: 1, marginTop: "50%", justifyContent: "center", alignItems: "center", padding: 40 }}>
                                         <FontAwesome name="tag" size={48} color="#7a7676" style={{ marginBottom: 10 }} />
                                         <Text style={{ fontSize: 20, color: "#7a7676", fontWeight: "700", textAlign: "center" }}>No clothes saved.</Text>
                                         <Text style={{ fontSize: 12, color: "#7a7676", textAlign: "center" }}>
@@ -283,6 +281,7 @@ export default function ClosetScreen() {
                     </View>
                 )}
 
+            {/* Show garment image as modal component */}
             <Modal
                 isVisible={isOpenGarment}
                 onBackdropPress={() => {
@@ -351,6 +350,7 @@ const styles = StyleSheet.create({
     },
     garmentSection: {
         flex: 1, 
+        height: "100%"
     },
     itemText: {
         fontWeight: "600", 

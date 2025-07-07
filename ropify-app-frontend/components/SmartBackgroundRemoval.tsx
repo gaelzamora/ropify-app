@@ -19,7 +19,7 @@ const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly }) => 
         <View style={styles.whiteBackground} />
         {isLoading && (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="small" color="#ee1e1e" />
+            <ActivityIndicator size="small" color="#222" />
           </View>
         )}
         <Image 
