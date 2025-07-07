@@ -1,5 +1,5 @@
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from "react-native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Garment } from "@/types/garment";
 import { useAuth } from "@/context/AuthContext";
@@ -42,10 +42,11 @@ export default function ClosetScreen() {
             .finally(() => setRefreshing(false))
     }, [activeClosetOption])
 
+
     const fetchClothes = async (category: string) => {
         try {
             setIsLoading(true)
-            const response = await garmentService.filterGarments(1, 12, user?.id, category)
+            const response = await garmentService.filterGarments(1, 18, user?.id, category)
             setClothes(response.data)
         } catch (error) {
             Alert.alert("Error: ", String(error))
@@ -54,11 +55,13 @@ export default function ClosetScreen() {
         }
     }
 
+
     const fetchDeleteGarments = async (garments: string[]) => {
         try {
             await garmentService.deleteMultipleGarments(garments)
 
             setElementsSelected([])
+            setIsDeleting(false)
 
             await fetchClothes(activeClosetOption.toLowerCase())
         } catch (error) {
@@ -115,6 +118,7 @@ export default function ClosetScreen() {
 
     useFocusEffect(useCallback(() => { fetchClothes(activeClosetOption.toLowerCase()) }, [activeClosetOption]))
 
+
     return (
         <>
             <View style={styles.closetContainer}>
@@ -153,8 +157,9 @@ export default function ClosetScreen() {
                             numColumns={3}
                             contentContainerStyle={{
                                 flex: 1,
+                                alignContent: "center",
                                 justifyContent: 'flex-start',
-                                gap: 5,
+                                width: "100%"
                             }}
                             refreshControl={
                                 <RefreshControl 
@@ -171,7 +176,7 @@ export default function ClosetScreen() {
                                     </View>
                                 ) : (
                                     <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 40 }}>
-                                        <FontAwesome name="save" size={48} color="#7a7676" style={{ marginBottom: 10 }} />
+                                        <FontAwesome name="tag" size={48} color="#7a7676" style={{ marginBottom: 10 }} />
                                         <Text style={{ fontSize: 20, color: "#7a7676", fontWeight: "700", textAlign: "center" }}>No clothes saved.</Text>
                                         <Text style={{ fontSize: 12, color: "#7a7676", textAlign: "center" }}>
                                             You haven&apos;t saved any clothes yet, so we don&apos;t have anything to show you! Go save some!.
@@ -202,7 +207,7 @@ export default function ClosetScreen() {
                                                 <Ionicons 
                                                     name="checkmark-circle" 
                                                     size={25} 
-                                                    color={"#ee1e1e"}
+                                                    color={"#222"}
                                                     style={{position: "absolute", left: 2, top: 2}}
                                                 />
                                             )}

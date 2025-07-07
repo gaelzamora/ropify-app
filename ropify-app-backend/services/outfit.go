@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/gaelzamora/ropify-app/models"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 type OutfitGeneratorService struct {
@@ -123,19 +125,68 @@ func (s *OutfitGeneratorService) areColorsCompatible(color1, color2 string) bool
 		return true
 	}
 
+	isHex1 := strings.HasPrefix(color1, "#")
+	isHex2 := strings.HasPrefix(color2, "#")
+
 	// Colores neutros combinan con todo
-	neutralColors := []string{"#FFFFFF", "#000000", "#808080", "#A9A9A9", "white", "black", "gray"}
-	for _, neutral := range neutralColors {
-		if strings.EqualFold(color1, neutral) || strings.EqualFold(color2, neutral) {
-			return true
-		}
-	}
+    neutralColors := []string{"#FFFFFF", "#F5F5F5", "#EEEEEE", "#000000", "#111111", "#222222", "#808080", "#A9A9A9"}
+    for _, neutral := range neutralColors {
+        if strings.EqualFold(color1, neutral) || strings.EqualFold(color2, neutral) {
+            return true
+        }
+    }
 
-	// Aquí podrías agregar reglas más complejas de color matching
-	// Por ejemplo, colores complementarios, análogos, etc.
+    // Si no son códigos hex, no podemos calcular compatibilidad avanzada
+    if !isHex1 || !isHex2 {
+        return true // Por defecto permitir la combinación
+    }
 
-	// Por ahora, usamos una probabilidad del 50%
-	return rand.Float32() > 0.5
+    // Convertir strings a objetos Color
+    c1, err1 := colorful.Hex(color1)
+    c2, err2 := colorful.Hex(color2)
+    if err1 != nil || err2 != nil {
+        return true // Si hay error, permitimos por defecto
+    }
+
+    // Convertir a HSL (Hue, Saturation, Lightness)
+    h1, s1, l1 := c1.Hsl()
+    h2, s2, l2 := c2.Hsl()
+
+    // 1. Complementarios (colores opuestos en la rueda)
+    hDiff := math.Abs(h1 - h2)
+    if (hDiff > 150 && hDiff < 210) {
+        return true // Colores opuestos (complementarios)
+    }
+
+    // 2. Análogos (colores adyacentes)
+    if hDiff < 30 || hDiff > 330 {
+        return true // Colores adyacentes (análogos)
+    }
+
+    // 3. Triádicos (120° en la rueda de color)
+    if (hDiff > 110 && hDiff < 130) || (hDiff > 230 && hDiff < 250) {
+        return true
+    }
+
+    // 4. Monocromáticos (mismo tono, diferente luminosidad)
+    if hDiff < 10 && math.Abs(l1-l2) > 0.2 {
+        return true
+    }
+
+    // 5. Regla básica de contraste para outfits
+    // Permitir combinaciones donde un color es oscuro y otro claro
+    if (l1 < 0.3 && l2 > 0.7) || (l2 < 0.3 && l1 > 0.7) {
+        return true
+    }
+
+    // 6. Colores con baja saturación combinan mejor entre sí
+    if s1 < 0.3 && s2 < 0.3 {
+        return true
+    }
+
+    // Para otros casos, usar una probabilidad más baja (30%)
+    // Esto mantiene cierta diversidad pero prioriza las reglas de color
+    return rand.Float32() > 0.7
 }
 
 // extractMainLabel extrae una etiqueta principal para describir la prenda
