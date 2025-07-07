@@ -17,7 +17,7 @@ const (
 	Top        GarmentCategory = "top"
 	Bottoms    GarmentCategory = "bottom"
 	Dress      GarmentCategory = "dress"
-	Sneakers   GarmentCategory = "snearkers"
+	Sneakers   GarmentCategory = "sneakers"
 	Accesories GarmentCategory = "accesories"
 	Backpack   GarmentCategory = "backpack"
 	Unknown    GarmentCategory = "unknown"

@@ -210,8 +210,8 @@ func (h *GarmentHandler) FilterGarments(ctx *fiber.Ctx) error {
 	context, cancel := context.WithTimeout(context.Background(), time.Duration(5*time.Second))
 	defer cancel()
 
-	pageParam := ctx.Query("page", "1")
-	limitParam := ctx.Query("limit", "10")
+	pageParam := ctx.Query("page")
+	limitParam := ctx.Query("limit")
 	color := ctx.Query("color", "")
 	brand := ctx.Query("brand", "")
 	category := ctx.Query("category", "")
@@ -480,7 +480,7 @@ func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
 	case "backpack":
 		category = models.Backpack
 	default:
-		category = models.Unknown
+		category = models.Accesories
 	}
 
 	color := "unknown"

@@ -183,7 +183,7 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 	req := &visionpb.AnnotateImageRequest{
 		Image: img,
 		Features: []*visionpb.Feature{
-			{Type: visionpb.Feature_LABEL_DETECTION, MaxResults: 10},
+			{Type: visionpb.Feature_LABEL_DETECTION, MaxResults: 20},
 			{Type: visionpb.Feature_IMAGE_PROPERTIES, MaxResults: 10},
 			{Type: visionpb.Feature_OBJECT_LOCALIZATION, MaxResults: 5}, // Añadido
 		},
@@ -196,7 +196,7 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		return nil, fmt.Errorf("Error en la llamada a Vision API: %v", err)
 	}
 
-	labels, err := client.DetectLabels(ctx, img, nil, 10)
+	labels, err := client.DetectLabels(ctx, img, nil, 20)
 	if err != nil {
 		return nil, fmt.Errorf("error al detectar etiquetas: %v", err)
 	}
@@ -240,24 +240,50 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"chinos":        "bottom",
 
 		// Dresses
-		"dress":    "dress",
-		"gown":     "dress",
-		"sundress": "dress",
+		"dress":             "dress",
+		"gown":              "dress",
+		"sundress":          "dress",
+		"cocktail dress":    "dress",
+		"day dress":         "dress",
+		"formal wear":       "dress",
+		"one-piece garment": "dress",
+		"evening gown":      "dress",
+		"haute couture":     "dress",
 
-		// Footwear
-		"sneakers": "sneakers",
-		"shoes":    "sneakers",
-		"boots":    "sneakers",
-		"sandals":  "sneakers",
-		"footwear": "sneakers",
+		// Sneakers
+		"sneakers":         "sneakers",
+		"shoes":            "sneakers",
+		"boots":            "sneakers",
+		"sandals":          "sneakers",
+		"footwear":         "sneakers",
+		"athletic shoes":   "sneakers",
+		"sports shoes":     "sneakers",
+		"basketball shoes": "sneakers",
+		"running shoes":    "sneakers",
+		"trainers":         "sneakers",
+		"jordan":           "sneakers", // Específicamente para Jordan
+		"nike":             "sneakers", // Marcas comunes
+		"adidas":           "sneakers",
+		"puma":             "sneakers",
+		"converse":         "sneakers",
+		"air jordan":       "sneakers",
+		"high tops":        "sneakers",
+		"sneaker":          "sneakers", // Singular
+		"walking shoe":     "sneakers",
+		"skate shoe":       "sneakers",
+		"outdoor shoe":     "sneakers",
+		"basketball shoe":  "sneakers", // Singular (ya tienes el plural)
+		"shoe":             "sneakers", // Genérico
+		"athletic shoe":    "sneakers", // Singular
 
 		// Accessories
-		"hat":    "accessories",
-		"cap":    "accessories",
-		"scarf":  "accessories",
-		"gloves": "accessories",
-		"socks":  "accessories",
-		"belt":   "accessories",
+		"hat":     "accessories",
+		"cap":     "accessories",
+		"scarf":   "accessories",
+		"gloves":  "accessories",
+		"socks":   "accessories",
+		"belt":    "accessories",
+		"glasses": "accesories",
 
 		// Bags
 		"backpack": "backpack",
@@ -268,23 +294,149 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"duffel":   "backpack",
 	}
 
-	for _, label := range labels {
-		labelTexts = append(labelTexts, label.Description)
+	priorityLabels := map[string]int{
+		// Prioridad alta para calzado
+		"sneakers":          100,
+		"shoes":             95,
+		"athletic shoes":    90,
+		"basketball shoes":  90,
+		"running shoes":     90,
+		"jordan":            100,
+		"air jordan":        100,
+		"walking shoe":      95,
+		"skate shoe":        95,
+		"outdoor shoe":      95,
+		"basketball shoe":   95, // Singular
+		"shoe":              90,
+		"athletic shoe":     95,
+		"nike":              85,
+		"adidas":            85,
+		"puma":              85,
+		"converse":          85,
+		"footwear":          80,
+		"trainers":          85,
+		"dress":             80,
+		"cocktail dress":    80,
+		"day dress":         80,
+		"formal wear":       75,
+		"one-piece garment": 75,
+		"evening gown":      75,
+		"haute couture":     70,
 
-		normLabel := strings.ToLower(strings.TrimSpace(label.Description))
+		// Prioridad media para tops
+		"shirt":   70,
+		"t-shirt": 70,
+		"hoodie":  70,
+		"jacket":  70,
+		"sweater": 70,
 
-		if category, ok := clothingCategories[normLabel]; ok {
-			mainCategory = category
-			break
+		// Prioridad media para bottoms
+		"pants":  65,
+		"shorts": 65,
+		"skirt":  65,
+
+		// Prioridad baja para materiales (ya que pueden aparecer en cualquier tipo de prenda)
+		"denim":   40,
+		"cotton":  30,
+		"leather": 30,
+		"fabric":  20,
+		"textile": 10,
+	}
+
+	highestPriority := -1
+	bestCategory := ""
+
+	singularize := func(word string) string {
+		// Reglas básicas para convertir a singular
+		if strings.HasSuffix(word, "shoes") {
+			return strings.TrimSuffix(word, "s")
+		}
+		if strings.HasSuffix(word, "s") && len(word) > 3 {
+			// Solo quitar la 's' si la palabra es larga para evitar casos como "is" -> "i"
+			return strings.TrimSuffix(word, "s")
+		}
+		return word
+	}
+
+	findCategoryForCompoundTerm := func(term string) (string, int) {
+		// Buscar coincidencia exacta primero
+		if category, ok := clothingCategories[term]; ok {
+			priority := 50
+			if p, exists := priorityLabels[term]; exists {
+				priority = p
+			}
+			return category, priority
 		}
 
+		// Luego buscar términos compuestos que contengan "dress"
+		if strings.Contains(term, "dress") {
+			return "dress", 75 // Alta prioridad para cualquier término que contenga "dress"
+		}
+
+		return "", -1 // No encontrado
+	}
+
+	// En tu bucle de labels:
+	for _, label := range labels {
+		labelTexts = append(labelTexts, label.Description)
+		normLabel := strings.ToLower(strings.TrimSpace(label.Description))
+		singularLabel := singularize(normLabel) // Normaliza a singular también
+
+		// Buscar categoría para el término compuesto
+		if category, priority := findCategoryForCompoundTerm(normLabel); category != "" {
+			if priority > highestPriority {
+				bestCategory = category
+				highestPriority = priority
+			}
+			continue // Pasar a la siguiente etiqueta
+		}
+
+		// Buscar coincidencia con ambas versiones
+		for _, labelVariation := range []string{normLabel, singularLabel} {
+			if category, ok := clothingCategories[labelVariation]; ok {
+				priority := 50
+				if p, exists := priorityLabels[labelVariation]; exists {
+					priority = p
+				}
+
+				if priority > highestPriority {
+					bestCategory = category
+					highestPriority = priority
+				}
+			}
+		}
+
+		// Buscar coincidencia parcial en categorías
 		for key, value := range clothingCategories {
 			if strings.Contains(normLabel, key) {
-				mainCategory = value
-				break
+				// Comprobar prioridad para coincidencias parciales
+				priority := 40 // Prioridad por defecto más baja para coincidencias parciales
+				if p, exists := priorityLabels[key]; exists {
+					priority = p - 5 // Ligera penalización por ser coincidencia parcial
+				}
+
+				if priority > highestPriority {
+					bestCategory = value
+					highestPriority = priority
+				}
 			}
 		}
 	}
+
+	// Usar la categoría con mayor prioridad si se encontró alguna
+	if bestCategory != "" {
+		mainCategory = bestCategory
+	}
+
+	// Resto del código existente...
+
+	// Para debug - imprimir todas las etiquetas detectadas con sus puntajes
+	fmt.Println("Todas las etiquetas detectadas:")
+	for i, label := range labels {
+		fmt.Printf("%d. %s (score: %.2f)\n", i+1, label.Description, label.Score)
+	}
+
+	fmt.Printf("Categoría seleccionada: %s (prioridad: %d)\n", mainCategory, highestPriority)
 
 	var colors []ColorInfo
 	if props != nil && props.DominantColors != nil {
