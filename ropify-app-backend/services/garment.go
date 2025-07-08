@@ -211,7 +211,7 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 
 	clothingCategories := map[string]string{
 		"shirt":        "top",
-		"t-shirt":      "top",
+		"active shirt": "top",
 		"t shirt":      "top",
 		"polo":         "top",
 		"polo shirt":   "top",
@@ -225,19 +225,22 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"cardigan":     "top",
 		"button shirt": "top",
 		"long sleeve":  "top", // Detecta prendas de manga larga
+		"sleeve":       "top",
 
 		// Bottoms
-		"jean":          "bottom",
-		"pants":         "bottom",
-		"denim":         "bottom",
-		"jeans":         "bottom",
-		"shorts":        "bottom",
-		"skirt":         "bottom",
-		"trousers":      "bottom",
-		"leggings":      "bottom",
-		"sweatpants":    "bottom",
-		"jogging pants": "bottom",
-		"chinos":        "bottom",
+		"jean":           "bottom",
+		"pants":          "bottom",
+		"denim":          "bottom",
+		"jeans":          "bottom",
+		"shorts":         "bottom",
+		"bermuda shorts": "bottom",
+		"active shorts":  "bottom",
+		"skirt":          "bottom",
+		"trousers":       "bottom",
+		"leggings":       "bottom",
+		"sweatpants":     "bottom",
+		"jogging pants":  "bottom",
+		"chinos":         "bottom",
 
 		// Dresses
 		"dress":             "dress",
@@ -275,34 +278,45 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"basketball shoe":  "sneakers", // Singular (ya tienes el plural)
 		"shoe":             "sneakers", // Genérico
 		"athletic shoe":    "sneakers", // Singular
+		"slipper":          "sneakers",
 
 		// Accessories
-		"hat":     "accessories",
-		"cap":     "accessories",
-		"scarf":   "accessories",
-		"gloves":  "accessories",
-		"socks":   "accessories",
-		"belt":    "accessories",
-		"glasses": "accesories",
+		"hat":          "accessories",
+		"cap":          "accessories",
+		"scarf":        "accessories",
+		"gloves":       "accessories",
+		"socks":        "accessories",
+		"belt":         "accessories",
+		"glasses":      "accesories",
+		"jewellery":    "accesories",
+		"body jewelry": "accesories",
+		"bag":          "accesories",
+		"handbag":      "accesories",
+		"shoulder bag": "accesories",
 
 		// Bags
-		"backpack": "backpack",
-		"bag":      "backpack",
-		"handbag":  "backpack",
-		"tote":     "backpack",
-		"purse":    "backpack",
-		"duffel":   "backpack",
+		"backpack":       "backpack",
+		"tote":           "backpack",
+		"purse":          "backpack",
+		"duffel":         "backpack",
+		"luggage & bags": "backpack",
+		"baggage":        "backpack",
+		"pocket":         "backpack",
 	}
 
 	priorityLabels := map[string]int{
 		// Prioridad alta para calzado
 		"sneakers":          100,
+		"jeans":             100,
+		"jean":              100,
 		"shoes":             95,
 		"athletic shoes":    90,
 		"basketball shoes":  90,
+		"shoulder bag":      90,
 		"running shoes":     90,
 		"jordan":            100,
 		"air jordan":        100,
+		"slipper":           100,
 		"walking shoe":      95,
 		"skate shoe":        95,
 		"outdoor shoe":      95,
@@ -313,6 +327,8 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"adidas":            85,
 		"puma":              85,
 		"converse":          85,
+		"sleeve":            90,
+		"active shirt":      90,
 		"footwear":          80,
 		"trainers":          85,
 		"dress":             80,
@@ -322,18 +338,39 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		"one-piece garment": 75,
 		"evening gown":      75,
 		"haute couture":     70,
+		"hat":               95,
+		"cap":               95,
+		"headgear":          98,
+		"baseball cap":      98,
+		"trucker hat":       95,
+		"visor":             90,
+		"cricket cap":       95,
+		"jewellery":         90,
+		"body jewelry":      90,
+
+		// Otros accesorios
+		"pocket":  90,
+		"glasses": 85,
+		"belt":    85,
+		"gloves":  85,
+		"scarf":   85,
+		"socks":   85,
+		"baggage": 85,
 
 		// Prioridad media para tops
-		"shirt":   70,
-		"t-shirt": 70,
-		"hoodie":  70,
-		"jacket":  70,
-		"sweater": 70,
+		"shirt":          70,
+		"t-shirt":        70,
+		"hoodie":         70,
+		"jacket":         70,
+		"sweater":        70,
+		"luggage & bags": 70,
 
 		// Prioridad media para bottoms
-		"pants":  65,
-		"shorts": 65,
-		"skirt":  65,
+		"pants":          100,
+		"shorts":         100,
+		"skirt":          65,
+		"bermuda shorts": 100,
+		"active shorts":  90,
 
 		// Prioridad baja para materiales (ya que pueden aparecer en cualquier tipo de prenda)
 		"denim":   40,
@@ -409,8 +446,22 @@ func AnalyzeGarmentImage(imageData []byte) (*VisionResult, error) {
 		// Buscar coincidencia parcial en categorías
 		for key, value := range clothingCategories {
 			if strings.Contains(normLabel, key) {
+				// Para accesorios, damos mayor peso a coincidencias exactas
+				if value == "accessories" && normLabel == key {
+					priority := 90 // Alta prioridad para coincidencias exactas de accesorios
+					if p, exists := priorityLabels[key]; exists {
+						priority = p
+					}
+
+					if priority > highestPriority {
+						bestCategory = value
+						highestPriority = priority
+					}
+					continue
+				}
+
 				// Comprobar prioridad para coincidencias parciales
-				priority := 40 // Prioridad por defecto más baja para coincidencias parciales
+				priority := 40 // Prioridad por defecto más baja
 				if p, exists := priorityLabels[key]; exists {
 					priority = p - 5 // Ligera penalización por ser coincidencia parcial
 				}
