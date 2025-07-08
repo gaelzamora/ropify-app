@@ -1,6 +1,7 @@
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import React, { useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import Modal from 'react-native-modal'
 
 const tabs = [
     "My Outfits",
@@ -13,6 +14,8 @@ export default function OutfitScreen() {
     const [searchQuery, setSearchQuery] = useState('')
     const [refreshing, setRefreshing] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+
+    const [isModalOutfitGeneratedActive, setIsModalOutfitGeneratedActive] = useState(false)
 
     return (
         <>
@@ -97,7 +100,10 @@ export default function OutfitScreen() {
 
                 </View>
                     <View style={styles.containerButtons}>
-                        <TouchableOpacity style={styles.buttonOutfit}>
+                        <TouchableOpacity 
+                            style={styles.buttonOutfit} 
+                            onPress={() => setIsModalOutfitGeneratedActive(true)}
+                        >
                             <Text style={styles.buttonText}>Generate Outfit</Text>
                         </TouchableOpacity>
 
@@ -105,6 +111,30 @@ export default function OutfitScreen() {
                             <Text style={styles.buttonText}>Create Outfit</Text>
                         </TouchableOpacity>
                     </View>
+                
+                <Modal
+                    isVisible={isModalOutfitGeneratedActive}
+                    onBackdropPress={() => {
+                        setIsModalOutfitGeneratedActive(false)
+                    }}
+                    onSwipeComplete={() => {
+                        setIsModalOutfitGeneratedActive(false)
+                    }}
+                    swipeDirection={['down']}
+                    backdropOpacity={0.7}
+                    animationIn="slideInUp"
+                    animationOut="slideOutDown"
+                    animationInTiming={300}
+                    animationOutTiming={300}
+                    style={styles.modal}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.dragIndicator} />
+                        <Text>
+                            Hello world
+                        </Text>
+                    </View>
+                </Modal>
             </View>
         </>
     )
@@ -187,5 +217,25 @@ const styles = StyleSheet.create({
     },
     outfitSection: {
         flex: 1
+    },
+    modal: {
+        margin: 0,
+        justifyContent: 'flex-end'
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        width: '100%',
+        height: '50%',
+        paddingTop: 15
+    },
+    dragIndicator: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#ccc',
+        borderRadius: 3,
+        marginBottom: 10,
+        alignSelf: 'center',
     }
 })

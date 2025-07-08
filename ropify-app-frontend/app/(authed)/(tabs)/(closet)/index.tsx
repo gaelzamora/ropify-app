@@ -169,7 +169,7 @@ export default function ClosetScreen() {
                             }
                             ListEmptyComponent={
                                 isLoading ? (
-                                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
+                                    <View style={{ flex: 1, marginTop: "50%", alignItems: "center", justifyContent: "center", padding: 40 }}>
                                         <ActivityIndicator size="large" color="#ee1e1e" />
                                     </View>
                                 ) : (
