@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 15,
         borderTopRightRadius: 15,
         width: '100%',
-        height: '50%',
+        height: '80%',
         paddingTop: 15
     },
     dragIndicator: {
