@@ -1,44 +1,80 @@
-import React, { useState } from 'react';
-import { View, Image, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Image, StyleSheet, Dimensions } from 'react-native';
 import * as SvgComponent from 'react-native-svg';
+import Shimmer from './Shimmer';
 
 type Point = {x: number, y: number};
 
 type Props = {
   imageUri: string;
   boundingPoly?: Point[];
+  style?: any;
 };
 
-const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly }) => {
+const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly, style }) => {
   const [isLoading, setIsLoading] = useState(true);
   
-  // Si no hay datos de segmentación, usar el componente simple
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (imageUri) {
+      timeoutId = setTimeout(() => {
+        setIsLoading(false);
+      }, 10000);
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [imageUri]);
+  
+  const handleLoadStart = useCallback(() => {
+    setIsLoading(true);
+  }, []);
+  
+  const handleLoadSuccess = useCallback(() => {
+    setIsLoading(false);
+  }, []);
+  
+  const handleLoadEnd = useCallback(() => {
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
+  }, []);
+  
   if (!boundingPoly || boundingPoly.length < 3) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, style]}>
         <View style={styles.whiteBackground} />
+        
+        {/* Mostrar el shimmer solo si isLoading es true */}
         {isLoading && (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="small" color="#222" />
+            <Shimmer />
           </View>
         )}
+        
         <Image 
           source={{ uri: imageUri }} 
-          style={styles.image} 
+          style={[
+            styles.image, 
+            isLoading ? { opacity: 0.4 } : { opacity: 1 }
+          ]} 
           resizeMode="contain"
-          onLoadStart={() => setIsLoading(true)}
-          onLoad={() => setIsLoading(false)}
-          onLoadEnd={() => setIsLoading(false)}
+          onLoadStart={handleLoadStart}
+          onLoad={handleLoadSuccess}
+          onLoadEnd={handleLoadEnd}
+          // Añadir esta prop para priorizar la carga
+          progressiveRenderingEnabled={true}
         />
       </View>
     );
   }
 
-  // Obtener dimensiones para el SVG
+  // El resto del código para el caso con boundingPoly
   const width = Dimensions.get('window').width - 32;
   const height = width;
-
-  // Crear el path para el SVG
+  
   const svgPath = boundingPoly
     .map((point, index) => {
       const x = point.x * width;
@@ -48,25 +84,24 @@ const SmartBackgroundRemoval: React.FC<Props> = ({ imageUri, boundingPoly }) => 
     .join(' ') + ' Z';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <View style={styles.whiteBackground} />
       
       {isLoading && (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="small" color="#ee1e1e" />
+          <Shimmer />
         </View>
       )}
       
-      {/* Imagen original */}
       <Image 
         source={{ uri: imageUri }} 
-        style={styles.image}
-        onLoadStart={() => setIsLoading(true)}
-        onLoad={() => setIsLoading(false)}
-        onLoadEnd={() => setIsLoading(false)}
+        style={[styles.image, isLoading ? { opacity: 0.4 } : { opacity: 1 }]}
+        onLoadStart={handleLoadStart}
+        onLoad={handleLoadSuccess}
+        onLoadEnd={handleLoadEnd}
+        progressiveRenderingEnabled={true}
       />
       
-      {/* SVG con clip path */}
       <View style={StyleSheet.absoluteFill}>
         <SvgComponent.Svg height={height} width={width}>
           <SvgComponent.Defs>
@@ -109,7 +144,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'transparent',
+    zIndex: 5,
   }
 });
 

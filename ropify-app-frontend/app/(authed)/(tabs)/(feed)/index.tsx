@@ -8,16 +8,18 @@ export default function FeedScreen() {
             flex: 1,
             alignItems: "center",
             justifyContent: "center",
+            width: 200,
+            marginHorizontal: "auto"
         }}>
             <Ionicons 
                 name="rocket-outline"
-                color={"#d85858"}
+                color={"#222"}
                 size={70}
             />
             <Text style={{
                 textAlign: "center",
                 fontSize: 20,
-                color: "#d85858",
+                color: "#222",
                 textTransform: "uppercase",
                 width: 300,
                 fontWeight: "800",
@@ -28,7 +30,7 @@ export default function FeedScreen() {
                 style={{
                     textAlign: "center",
                     fontSize: 12,
-                    color: "#d85858",
+                    color: "#888",
                     fontWeight: "800",
                     marginTop: 5
                 }}

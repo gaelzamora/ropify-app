@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
@@ -228,12 +229,51 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 
 	outfit, garments, err := h.outfitGenerator.GenerateRandomOutfit(context, userID)
 	if err != nil {
+		// Separamos los errores en dos categorías: esenciales y no esenciales
+
+		// 1. Errores por falta de prendas esenciales (tops, bottoms, sneakers)
+		if strings.Contains(err.Error(), "no top garments found") ||
+			strings.Contains(err.Error(), "no bottom garments found") ||
+			strings.Contains(err.Error(), "no basic tops found") {
+
+			return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+				"status": "success",
+				"data": fiber.Map{
+					"outfit":   nil,
+					"garments": []*models.Garment{},
+					"message":  "Not enough essential garments (tops, bottoms) to generate an outfit. Please add more clothing to your wardrobe.",
+				},
+			})
+		}
+
+		// 2. Errores por falta de prendas no esenciales (vestidos, accesorios, etc.)
+		// Estos errores no deberían detener la generación de outfits
+		if strings.Contains(err.Error(), "no dress garments found") ||
+			strings.Contains(err.Error(), "no accessories found") {
+
+			// En este caso, intentamos generar un outfit alternativo sin estas prendas
+			// Nota: Esta lógica tendría que estar implementada en el servicio OutfitGeneratorService
+			// para permitir generación de outfits con prendas opcionales faltantes
+
+			// Por ahora devolvemos una respuesta que indica que faltan prendas opcionales
+			return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+				"status": "success",
+				"data": fiber.Map{
+					"outfit":   nil,
+					"garments": []*models.Garment{},
+					"message":  "Some optional garments are missing, but you can still add more variety to your wardrobe.",
+				},
+			})
+		}
+
+		// Para otros tipos de errores, mantener el comportamiento original
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
 			"message": err.Error(),
 		})
 	}
 
+	// El resto del código permanece igual...
 	if ctx.Query("save", "false") == "true" {
 		savedOutfit, err := h.repository.AddOutfit(context, outfit)
 		if err != nil {

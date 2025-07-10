@@ -1,7 +1,10 @@
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import React, { useState } from "react";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import Modal from 'react-native-modal'
+import { outfitService } from "@/services/outfit";
+import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
+import { Garment } from "@/types/garment";
 
 const tabs = [
     "My Outfits",
@@ -12,10 +15,23 @@ export default function OutfitScreen() {
     const [activeOptionSelected, setActiveOptionSelected] = useState(tabs[0])
     const [outfits, setOutfits] = useState<any>(null)
     const [searchQuery, setSearchQuery] = useState('')
-    const [refreshing, setRefreshing] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-
+    const [save, setSave] = useState(false)
+    const [isLoadingRandomOutfit, setIsLoadingRandomOutfit] = useState(false)
+    const [outfitRandom, setOutfitRandom] = useState<Garment[]>([])
     const [isModalOutfitGeneratedActive, setIsModalOutfitGeneratedActive] = useState(false)
+
+    const fetchGenerateRandomOutfit = async (save: boolean) => {
+        try {
+            setIsLoadingRandomOutfit(true)
+            const response = await outfitService.generateRandomOutfit(save)
+            setOutfitRandom(response.data.garments)
+        } catch (error) {
+            Alert.alert("Error: ", String(error))
+        } finally {
+            setIsLoadingRandomOutfit(false)
+        }
+    }
 
     return (
         <>
@@ -112,29 +128,76 @@ export default function OutfitScreen() {
                         </TouchableOpacity>
                     </View>
                 
-                <Modal
-                    isVisible={isModalOutfitGeneratedActive}
-                    onBackdropPress={() => {
-                        setIsModalOutfitGeneratedActive(false)
-                    }}
-                    onSwipeComplete={() => {
-                        setIsModalOutfitGeneratedActive(false)
-                    }}
-                    swipeDirection={['down']}
-                    backdropOpacity={0.7}
-                    animationIn="slideInUp"
-                    animationOut="slideOutDown"
-                    animationInTiming={300}
-                    animationOutTiming={300}
-                    style={styles.modal}
-                >
-                    <View style={styles.modalContent}>
-                        <View style={styles.dragIndicator} />
-                        <Text>
-                            Hello world
-                        </Text>
-                    </View>
-                </Modal>
+                    <Modal
+                        isVisible={isModalOutfitGeneratedActive}
+                        onBackdropPress={() => {
+                            setIsModalOutfitGeneratedActive(false)
+                        }}
+                        onSwipeComplete={() => {
+                            setIsModalOutfitGeneratedActive(false)
+                        }}
+                        swipeDirection={['down']}
+                        backdropOpacity={0.7}
+                        animationIn="slideInUp"
+                        animationOut="slideOutDown"
+                        animationInTiming={300}
+                        animationOutTiming={300}
+                        style={styles.modal}
+                    >
+                        <View style={styles.modalContent}>
+                            <View style={styles.dragIndicator} />
+                            <View style={styles.contentRandomOutfit}>
+
+                                    <FlatList 
+                                        data={outfitRandom}
+                                        keyExtractor={(item) => item.id.toString()}
+                                        numColumns={3}
+                                        contentContainerStyle={{
+                                            alignContent: "center",
+                                            justifyContent: "flex-start",
+                                            width: "100%",
+                                        }}
+                                        ListEmptyComponent={
+                                            isLoadingRandomOutfit ? (
+                                                <View style={{ alignItems: "center", justifyContent: "center", padding: 20, marginTop: "50%" }}>
+                                                    <ActivityIndicator 
+                                                        size={"large"}
+                                                        color={"#222"}
+                                                    />
+                                                </View>
+                                            ) : (
+                                                <View style={{ alignItems: "center", justifyContent: "center", padding: 20, marginTop: "50%" }}>
+                                                    <FontAwesome 
+                                                        name="random"
+                                                        size={48}
+                                                        color={"#888"}
+                                                        style={{ marginBottom: 10 }}
+                                                    />
+                                                    <Text style={{ fontSize: 14, color: "#888", fontWeight: "600" }}>Generate an outfit</Text>
+                                                </View>
+                                            )
+                                        }
+                                        renderItem={({ item: garment }) => (
+                                            <TouchableOpacity
+                                                style={styles.garmentContainer}  
+                                            >
+                                                <SmartBackgroundRemoval 
+                                                    imageUri={garment.image_url}
+                                                    boundingPoly={garment.boundingPoly}
+                                                />
+                                            </TouchableOpacity>
+                                        )}
+                                    />
+
+                                <TouchableOpacity
+                                    style={styles.buttonGenerate}
+                                    onPress={() => fetchGenerateRandomOutfit(save)}
+                                >
+                                    <Text style={{ color: "white", fontSize: 18 }}>Generate Outfit</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
             </View>
         </>
     )
@@ -222,20 +285,46 @@ const styles = StyleSheet.create({
         margin: 0,
         justifyContent: 'flex-end'
     },
-    modalContent: {
+    modalContent: { 
         backgroundColor: 'white',
         borderTopLeftRadius: 15,
         borderTopRightRadius: 15,
         width: '100%',
         height: '80%',
-        paddingTop: 15
+        paddingTop: 15,
+        position: "relative"
     },
     dragIndicator: {
-        width: 40,
+        width: 60,
         height: 5,
         backgroundColor: '#ccc',
         borderRadius: 3,
         marginBottom: 10,
         alignSelf: 'center',
-    }
+    },
+    contentRandomOutfit: {
+        flex: 1, 
+        justifyContent: "center",
+        alignItems: "center",
+        alignContent: "center"
+    },
+    buttonGenerate: {
+        paddingHorizontal: 60,
+        paddingVertical: 16,
+        backgroundColor: "#222",
+        borderRadius: 10,
+        position: "absolute",
+        bottom: 25
+    },
+    garmentContainer: {
+        width: '30%',
+        aspectRatio: 1,
+        margin: 5,
+        backgroundColor: 'transparent', 
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: 'hidden',
+        borderRadius: 15,
+        position: "relative"
+    },
 })
