@@ -34,10 +34,12 @@ func main() {
 	garmentRepository := repositories.NewGarmentRepository(db)
 	outfitRepository := repositories.NewOutfitRepository(db)
 	authRepository := repositories.NewAuthRepository(db)
+	closetRepository := repositories.NewClosetRepository(db)
 
 	// Service
 	authService := services.NewAuthService(authRepository)
 	oauthService := services.NewOAuthService(authRepository)
+	outfitService := services.NewOutfitGeneratorService(garmentRepository)
 
 	server := app.Group("/api")
 
@@ -49,7 +51,8 @@ func main() {
 	privateRoutes := server.Use(middlewares.AuthProtected(db))
 
 	handlers.NewGarmentHandler(privateRoutes.Group("/garment"), garmentRepository)
-	handlers.NewOutfitHandler(privateRoutes.Group("/outfit"), outfitRepository, garmentRepository)
+	handlers.NewOutfitHandler(privateRoutes.Group("/outfit"), outfitRepository, garmentRepository, closetRepository)
+	handlers.NewClosetHandler(privateRoutes.Group("/closet"), closetRepository, garmentRepository, outfitRepository, outfitService)
 
 	app.Listen(fmt.Sprintf("0.0.0.0:" + envConfig.ServerPort))
 }

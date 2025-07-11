@@ -17,5 +17,7 @@ func DBMigrator(db *gorm.DB) error {
 		&models.User{},
 		&models.Garment{},
 		&models.Outfit{},
+		&models.Closet{},
+		&models.ClosetGarment{},
 	)
 }

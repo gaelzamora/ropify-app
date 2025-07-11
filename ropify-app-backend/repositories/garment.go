@@ -19,6 +19,16 @@ func (r *GarmentRepository) AddGarment(ctx context.Context, garment *models.Garm
 	return garment, nil
 }
 
+func (r *GarmentRepository) GetGarmentByID(ctx context.Context, garmentID uuid.UUID) (models.Garment, error) {
+	var garment models.Garment
+
+	if err := r.db.WithContext(ctx).First(&garment, "id = ?", garmentID); err != nil {
+		return garment, err.Error
+	}
+
+	return garment, nil
+}
+
 func (r *GarmentRepository) FindByBarcode(ctx context.Context, barcode string) (*models.Garment, error) {
 	var garment models.Garment
 	if err := r.db.WithContext(ctx).Where("barcode = ?", barcode).First(&garment).Error; err != nil {

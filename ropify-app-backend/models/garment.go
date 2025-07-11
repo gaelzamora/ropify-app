@@ -58,6 +58,7 @@ type Garment struct {
 type GarmentRepository interface {
 	AddGarment(ctx context.Context, garment *Garment) (*Garment, error)
 	FindByBarcode(ctx context.Context, barcode string) (*Garment, error)
+	GetGarmentByID(ctx context.Context, garmentID uuid.UUID) (Garment, error)
 
 	UpdateGarment(ctx context.Context, garmentID uuid.UUID, updatedData map[string]interface{}) (*Garment, error)
 

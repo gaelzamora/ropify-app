@@ -16,6 +16,7 @@ import (
 
 type OutfitGeneratorService struct {
 	garmentRepository models.GarmentRepository
+	closetRepository  models.ClosetRepository
 }
 
 func NewOutfitGeneratorService(garmentRepository models.GarmentRepository) *OutfitGeneratorService {
@@ -36,95 +37,95 @@ const (
 
 // getAccessoryType clasifica un accesorio en su subcategoría
 func (s *OutfitGeneratorService) getAccessoryType(garment *models.Garment) AccessoryType {
-    // Solo procesar si es un accesorio
-    if garment.Category != "accesories" {
-        return AccessoryTypeOther
-    }
-    
-    // Detectar gorras/sombreros
-    if s.isHat(garment) {
-        return AccessoryTypeHat
-    }
-    
-    // Detectar bolsos/mochilas
-    if s.isBag(garment) {
-        return AccessoryTypeBag
-    }
-    
-    // Detectar gafas/lentes
-    if s.isGlasses(garment) {
-        return AccessoryTypeGlasses
-    }
-    
-    // Detectar joyería (collares, pulseras, anillos)
-    if s.isJewelry(garment) {
-        return AccessoryTypeJewelry
-    }
-    
-    return AccessoryTypeOther
+	// Solo procesar si es un accesorio
+	if garment.Category != "accesories" {
+		return AccessoryTypeOther
+	}
+
+	// Detectar gorras/sombreros
+	if s.isHat(garment) {
+		return AccessoryTypeHat
+	}
+
+	// Detectar bolsos/mochilas
+	if s.isBag(garment) {
+		return AccessoryTypeBag
+	}
+
+	// Detectar gafas/lentes
+	if s.isGlasses(garment) {
+		return AccessoryTypeGlasses
+	}
+
+	// Detectar joyería (collares, pulseras, anillos)
+	if s.isJewelry(garment) {
+		return AccessoryTypeJewelry
+	}
+
+	return AccessoryTypeOther
 }
 
 // isHat detecta si un accesorio es una gorra o sombrero
 func (s *OutfitGeneratorService) isHat(garment *models.Garment) bool {
-    hatKeywords := []string{"hat", "cap", "beanie", "headgear", "visor", "baseball cap", 
-                            "cricket cap", "trucker hat", "fedora", "beret"}
-    
-    for _, label := range garment.Labels {
-        lower := strings.ToLower(label)
-        for _, keyword := range hatKeywords {
-            if strings.Contains(lower, keyword) {
-                return true
-            }
-        }
-    }
-    return false
+	hatKeywords := []string{"hat", "cap", "beanie", "headgear", "visor", "baseball cap",
+		"cricket cap", "trucker hat", "fedora", "beret"}
+
+	for _, label := range garment.Labels {
+		lower := strings.ToLower(label)
+		for _, keyword := range hatKeywords {
+			if strings.Contains(lower, keyword) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isBag detecta si un accesorio es una bolsa o mochila
 func (s *OutfitGeneratorService) isBag(garment *models.Garment) bool {
-    bagKeywords := []string{"bag", "handbag", "purse", "backpack", "tote", "clutch", 
-                           "shoulder bag", "crossbody", "messenger", "pouch", "wallet"}
-    
-    for _, label := range garment.Labels {
-        lower := strings.ToLower(label)
-        for _, keyword := range bagKeywords {
-            if strings.Contains(lower, keyword) {
-                return true
-            }
-        }
-    }
-    return false
+	bagKeywords := []string{"bag", "handbag", "purse", "backpack", "tote", "clutch",
+		"shoulder bag", "crossbody", "messenger", "pouch", "wallet"}
+
+	for _, label := range garment.Labels {
+		lower := strings.ToLower(label)
+		for _, keyword := range bagKeywords {
+			if strings.Contains(lower, keyword) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isGlasses detecta si un accesorio es lentes/gafas
 func (s *OutfitGeneratorService) isGlasses(garment *models.Garment) bool {
-    glassesKeywords := []string{"glasses", "sunglasses", "eyewear", "spectacles", "shades"}
-    
-    for _, label := range garment.Labels {
-        lower := strings.ToLower(label)
-        for _, keyword := range glassesKeywords {
-            if strings.Contains(lower, keyword) {
-                return true
-            }
-        }
-    }
-    return false
+	glassesKeywords := []string{"glasses", "sunglasses", "eyewear", "spectacles", "shades"}
+
+	for _, label := range garment.Labels {
+		lower := strings.ToLower(label)
+		for _, keyword := range glassesKeywords {
+			if strings.Contains(lower, keyword) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isJewelry detecta si un accesorio es joyería (puede haber múltiples)
 func (s *OutfitGeneratorService) isJewelry(garment *models.Garment) bool {
-    jewelryKeywords := []string{"necklace", "bracelet", "ring", "earring", "jewelry", 
-                               "pendant", "chain", "anklet", "bangle", "jewellery"}
-    
-    for _, label := range garment.Labels {
-        lower := strings.ToLower(label)
-        for _, keyword := range jewelryKeywords {
-            if strings.Contains(lower, keyword) {
-                return true
-            }
-        }
-    }
-    return false
+	jewelryKeywords := []string{"necklace", "bracelet", "ring", "earring", "jewelry",
+		"pendant", "chain", "anklet", "bangle", "jewellery"}
+
+	for _, label := range garment.Labels {
+		lower := strings.ToLower(label)
+		for _, keyword := range jewelryKeywords {
+			if strings.Contains(lower, keyword) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Funciones auxiliares para categorizar prendas segun sus etiquetas
@@ -189,199 +190,166 @@ func (s *OutfitGeneratorService) validateOutfit(garments []*models.Garment) bool
 }
 
 // GenerateRandomOutfit crea un outfit aleatorio basado en colores y etiquetas compatibles
-func (s *OutfitGeneratorService) GenerateRandomOutfit(ctx context.Context, userID uuid.UUID) (*models.Outfit, []*models.Garment, error) {
-	// 1. PRIMERA DECISIÓN: Elegir entre outfit basado en vestido o en conjunto top-bottom
-	useDress := rand.Intn(100) < 40 // 100% de probabilidad de usar vestido
+func (s *OutfitGeneratorService) GenerateRandomOutfitFromCloset(ctx context.Context, closetID uuid.UUID) (*models.Outfit, []*models.Garment, error) {
+	// 1. Obtener categorías esenciales del closet
+	tops, err := s.closetRepository.GetGarmentsByCategoryAndCloset(ctx, closetID, "top", 10)
+	if err != nil || len(tops) == 0 {
+		return nil, nil, fmt.Errorf("no top garments found in this closet")
+	}
 
-	var baseGarments []*models.Garment // Prendas base del outfit
+	bottoms, err := s.closetRepository.GetGarmentsByCategoryAndCloset(ctx, closetID, "bottom", 10)
+	if err != nil || len(bottoms) == 0 {
+		return nil, nil, fmt.Errorf("no bottom garments found in this closet")
+	}
+
+	shoes, err := s.closetRepository.GetGarmentsByCategoryAndCloset(ctx, closetID, "sneakers", 10)
+	if err != nil || len(shoes) == 0 {
+		return nil, nil, fmt.Errorf("no sneakers found in this closet")
+	}
+
+	var baseGarments []*models.Garment
 	var garmentIDs pq.StringArray
-	var outfitType string
 
-	if useDress {
-		// === CAMINO DEL VESTIDO ===
-		dresses, err := s.garmentRepository.GetGarmentsByCategory(ctx, userID, "dress", 10)
-		if err != nil || len(dresses) == 0 {
-			// Si no hay vestidos disponibles, cambiamos a conjunto top-bottom
-			fmt.Println("Error al obtener vestidos: %v\n", err)
-			useDress = false
-		} else if len(dresses) == 0 {
-			fmt.Println("No hay veestidos disponibles para el usuario")
-			useDress = false
+	// === CAMINO TOP + BOTTOM ===
+	// Filtrar tops en capas interiores/exteriores
+	var innerTops, outerTops []*models.Garment
+	for _, top := range tops {
+		if s.isOuterLayer(top) {
+			outerTops = append(outerTops, top)
 		} else {
-			// Usar un vestido como base
-			dress := dresses[rand.Intn(len(dresses))]
-			baseGarments = append(baseGarments, dress)
-			garmentIDs = append(garmentIDs, dress.ID.String())
-			outfitType = "dress"
+			innerTops = append(innerTops, top)
 		}
 	}
 
-	if !useDress {
-		// === CAMINO TOP + BOTTOM ===
-		// 1. Seleccionar top
-		tops, err := s.garmentRepository.GetGarmentsByCategory(ctx, userID, "top", 10)
-		if err != nil || len(tops) == 0 {
-			return nil, nil, fmt.Errorf("no top garments found")
-		}
-
-		// Filtrar si es capa exterior (necesita capa interior)
-		var innerTops, outerTops []*models.Garment
-		for _, top := range tops {
-			if s.isOuterLayer(top) {
-				outerTops = append(outerTops, top)
-			} else {
-				innerTops = append(innerTops, top)
-			}
-		}
-
-		// Seleccionar top básico primero
-		if len(innerTops) == 0 {
-			return nil, nil, fmt.Errorf("no basic tops found")
-		}
-
-		mainTop := innerTops[rand.Intn(len(innerTops))]
-		baseGarments = append(baseGarments, mainTop)
-		garmentIDs = append(garmentIDs, mainTop.ID.String())
-
-		// Añadir capa exterior aleatoriamente (30% de probabilidad)
-		if len(outerTops) > 0 && rand.Intn(100) < 30 {
-			// Filtrar outer layers que combinen con el top
-			matchingOuters := s.filterByColorMatch(mainTop, outerTops)
-			if len(matchingOuters) > 0 {
-				outer := matchingOuters[rand.Intn(len(matchingOuters))]
-				baseGarments = append(baseGarments, outer)
-				garmentIDs = append(garmentIDs, outer.ID.String())
-			}
-		}
-
-		// 2. Seleccionar bottom
-		bottoms, err := s.garmentRepository.GetGarmentsByCategory(ctx, userID, "bottom", 10)
-		if err != nil || len(bottoms) == 0 {
-			return nil, nil, fmt.Errorf("no bottom garments found")
-		}
-
-		// Filtrar bottoms por compatibilidad de color
-		matchingBottoms := s.filterByColorMatch(baseGarments[0], bottoms)
-		if len(matchingBottoms) == 0 {
-			matchingBottoms = bottoms
-		}
-
-		bottom := matchingBottoms[rand.Intn(len(matchingBottoms))]
-		baseGarments = append(baseGarments, bottom)
-		garmentIDs = append(garmentIDs, bottom.ID.String())
-		outfitType = "casual"
+	// Seleccionar top básico primero
+	if len(innerTops) == 0 {
+		return nil, nil, fmt.Errorf("no basic tops found in this closet")
 	}
+
+	mainTop := innerTops[rand.Intn(len(innerTops))]
+	baseGarments = append(baseGarments, mainTop)
+	garmentIDs = append(garmentIDs, mainTop.ID.String())
+
+	// Añadir capa exterior aleatoriamente (30% de probabilidad)
+	if len(outerTops) > 0 && rand.Intn(100) < 30 {
+		matchingOuters := s.filterByColorMatch(mainTop, outerTops)
+		if len(matchingOuters) > 0 {
+			outer := matchingOuters[rand.Intn(len(matchingOuters))]
+			baseGarments = append(baseGarments, outer)
+			garmentIDs = append(garmentIDs, outer.ID.String())
+		}
+	}
+
+	// Seleccionar bottom que combine
+	matchingBottoms := s.filterByColorMatch(baseGarments[0], bottoms)
+	if len(matchingBottoms) == 0 {
+		matchingBottoms = bottoms
+	}
+
+	bottom := matchingBottoms[rand.Intn(len(matchingBottoms))]
+	baseGarments = append(baseGarments, bottom)
+	garmentIDs = append(garmentIDs, bottom.ID.String())
 
 	// 3. CALZADO INTELIGENTE
-	shoes, err := s.garmentRepository.GetGarmentsByCategory(ctx, userID, "sneakers", 10)
-	if err == nil && len(shoes) > 0 {
-		// Filtrar sandalias si hay pantalones
-		hasPants := false
-		for _, garment := range baseGarments {
-			if s.isPant(garment) {
-				hasPants = true
-				break
-			}
-		}
-
-		var compatibleShoes []*models.Garment
-		for _, shoe := range shoes {
-			// Si hay pantalones, no usar sandalias
-			if hasPants && s.isSandal(shoe) {
-				continue
-			}
-			compatibleShoes = append(compatibleShoes, shoe)
-		}
-
-		if len(compatibleShoes) > 0 {
-			// Buscar zapatos que combinen con el bottom o el vestido
-			baseForShoe := baseGarments[len(baseGarments)-1] // Último elemento (bottom o dress)
-			matchingShoes := s.filterByColorMatch(baseForShoe, compatibleShoes)
-			if len(matchingShoes) == 0 {
-				matchingShoes = compatibleShoes
-			}
-
-			shoe := matchingShoes[rand.Intn(len(matchingShoes))]
-			baseGarments = append(baseGarments, shoe)
-			garmentIDs = append(garmentIDs, shoe.ID.String())
+	// Filtrar sandalias si hay pantalones
+	hasPants := false
+	for _, garment := range baseGarments {
+		if s.isPant(garment) {
+			hasPants = true
+			break
 		}
 	}
 
-	// 4. MÚLTIPLES ACCESORIOS
-	accessories, err := s.garmentRepository.GetGarmentsByCategory(ctx, userID, "accesories", 20) // Aumentar a 20 para tener más variedad
-	if err == nil && len(accessories) > 0 {
-		// Mapa para rastrear los tipos de accesorios ya seleccionados
-		selectedAccessoryTypes := make(map[AccessoryType]int)
-		
-		// Límites por tipo de accesorio
-		accessoryLimits := map[AccessoryType]int{
-			AccessoryTypeHat:     1, // Máximo 1 gorra/sombrero
-			AccessoryTypeBag:     1, // Máximo 1 bolsa/mochila
-			AccessoryTypeGlasses: 1, // Máximo 1 par de gafas
-			AccessoryTypeJewelry: 3, // Máximo 3 piezas de joyería
-			AccessoryTypeOther:   2, // Máximo 2 de otros tipos
+	var compatibleShoes []*models.Garment
+	for _, shoe := range shoes {
+		// Si hay pantalones, no usar sandalias
+		if hasPants && s.isSandal(shoe) {
+			continue
 		}
-		
-		// Número máximo total de accesorios (3-5)
+		compatibleShoes = append(compatibleShoes, shoe)
+	}
+
+	// Si después del filtrado no hay zapatos compatibles, usar cualquiera
+	if len(compatibleShoes) == 0 {
+		compatibleShoes = shoes
+	}
+
+	// Buscar zapatos que combinen con el bottom
+	baseForShoe := baseGarments[len(baseGarments)-1]
+	matchingShoes := s.filterByColorMatch(baseForShoe, compatibleShoes)
+	if len(matchingShoes) == 0 {
+		matchingShoes = compatibleShoes
+	}
+
+	shoe := matchingShoes[rand.Intn(len(matchingShoes))]
+	baseGarments = append(baseGarments, shoe)
+	garmentIDs = append(garmentIDs, shoe.ID.String())
+
+	// 4. ACCESORIOS OPCIONALES
+	accessories, err := s.closetRepository.GetGarmentsByCategoryAndCloset(ctx, closetID, "accesories", 20)
+	if err == nil && len(accessories) > 0 {
+		// Usar la lógica existente de accesorios
+		selectedAccessoryTypes := make(map[AccessoryType]int)
+
+		accessoryLimits := map[AccessoryType]int{
+			AccessoryTypeHat:     1,
+			AccessoryTypeBag:     1,
+			AccessoryTypeGlasses: 1,
+			AccessoryTypeJewelry: 3,
+			AccessoryTypeOther:   2,
+		}
+
 		maxAccessories := rand.Intn(3) + 3
-		
-		// Filtrar accesorios por compatibilidad de color
+
 		topGarment := baseGarments[0]
 		matchingAccessories := s.filterByColorMatch(topGarment, accessories)
 		if len(matchingAccessories) < 3 {
-			matchingAccessories = accessories // Si hay pocos matches, usar todos
+			matchingAccessories = accessories
 		}
-		
-		// Mezclar aleatoriamente para no favorecer siempre los mismos accesorios
+
 		rand.Shuffle(len(matchingAccessories), func(i, j int) {
 			matchingAccessories[i], matchingAccessories[j] = matchingAccessories[j], matchingAccessories[i]
 		})
-		
-		// Añadir accesorios respetando los límites por tipo
+
 		accessoriesAdded := 0
 		for _, acc := range matchingAccessories {
-			// Clasificar el accesorio
 			accType := s.getAccessoryType(acc)
-			
-			// Verificar si ya alcanzamos el límite para este tipo
+
 			if selectedAccessoryTypes[accType] >= accessoryLimits[accType] {
 				continue
 			}
-			
-			// Añadir el accesorio
+
 			baseGarments = append(baseGarments, acc)
 			garmentIDs = append(garmentIDs, acc.ID.String())
 			selectedAccessoryTypes[accType]++
 			accessoriesAdded++
-			
-			// Detener si llegamos al máximo total de accesorios
+
 			if accessoriesAdded >= maxAccessories {
 				break
 			}
 		}
 	}
 
-	// 5. NOMBRE DESCRIPTIVO MEJORADO
-	var outfitName string
-	if outfitType == "dress" {
-		outfitName = fmt.Sprintf("%s outfit with accessories", s.extractMainLabel(baseGarments[0]))
-	} else {
-		// Para conjuntos top-bottom
-		topLabel := s.extractMainLabel(baseGarments[0])
-		bottomLabel := s.extractMainLabel(baseGarments[len(baseGarments)/2]) // Aproximadamente el bottom
-		outfitName = fmt.Sprintf("%s with %s outfit", topLabel, bottomLabel)
+	// 5. GENERAR NOMBRE DESCRIPTIVO
+	topLabel := s.extractMainLabel(baseGarments[0])
+	bottomLabel := s.extractMainLabel(baseGarments[len(baseGarments)/2])
+	outfitName := fmt.Sprintf("%s with %s outfit", topLabel, bottomLabel)
 
-		// Añadir estilo si es evidente
-		if strings.Contains(strings.ToLower(topLabel), "formal") ||
-			strings.Contains(strings.ToLower(bottomLabel), "formal") {
-			outfitName = "Formal " + outfitName
-		} else if len(baseGarments) > 4 {
-			outfitName = "Complete " + outfitName
-		}
+	if strings.Contains(strings.ToLower(topLabel), "formal") ||
+		strings.Contains(strings.ToLower(bottomLabel), "formal") {
+		outfitName = "Formal " + outfitName
+	} else if len(baseGarments) > 4 {
+		outfitName = "Complete " + outfitName
+	}
+
+	// Obtener userID desde el closet
+	closet, err := s.closetRepository.GetClosetByID(ctx, closetID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error retrieving closet info: %v", err)
 	}
 
 	outfit := &models.Outfit{
-		UserID:     userID,
+		UserID:     closet.UserID,
 		Name:       outfitName,
 		GarmentIDs: garmentIDs,
 		CreatedAt:  time.Now(),

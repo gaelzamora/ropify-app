@@ -14,8 +14,10 @@ import (
 )
 
 type OutfitHandler struct {
-	repository      models.OutfitRepository
-	outfitGenerator *services.OutfitGeneratorService
+	repository        models.OutfitRepository
+	garmentRepository models.GarmentRepository
+	closetRepository  models.ClosetRepository
+	outfitGenerator   *services.OutfitGeneratorService
 }
 
 // Crear outfit
@@ -224,56 +226,66 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 		})
 	}
 
+	// REQUERIR closet_id (ya no es opcional)
+	closetIDStr := ctx.Query("closet_id", "")
+	if closetIDStr == "" {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Closet ID is required",
+		})
+	}
+
+	closetID, err := uuid.Parse(closetIDStr)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid closet ID",
+		})
+	}
+
+	// Verificar que el closet existe y pertenece al usuario
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	outfit, garments, err := h.outfitGenerator.GenerateRandomOutfit(context, userID)
+	closet, err := h.closetRepository.GetClosetByID(context, closetID)
 	if err != nil {
-		// Separamos los errores en dos categorías: esenciales y no esenciales
+		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Closet not found",
+		})
+	}
 
-		// 1. Errores por falta de prendas esenciales (tops, bottoms, sneakers)
+	if closet.UserID != userID {
+		return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "You don't have access to this closet",
+		})
+	}
+
+	// Generar outfit desde el closet
+	outfit, garments, err := h.outfitGenerator.GenerateRandomOutfitFromCloset(context, closetID)
+	if err != nil {
+		// Manejar errores específicos
 		if strings.Contains(err.Error(), "no top garments found") ||
 			strings.Contains(err.Error(), "no bottom garments found") ||
-			strings.Contains(err.Error(), "no basic tops found") {
-
+			strings.Contains(err.Error(), "no sneakers found") {
 			return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 				"status": "success",
 				"data": fiber.Map{
 					"outfit":   nil,
 					"garments": []*models.Garment{},
-					"message":  "Not enough essential garments (tops, bottoms) to generate an outfit. Please add more clothing to your wardrobe.",
+					"message":  "This closet doesn't have all required garments (top, bottom, and sneakers).",
 				},
 			})
 		}
 
-		// 2. Errores por falta de prendas no esenciales (vestidos, accesorios, etc.)
-		// Estos errores no deberían detener la generación de outfits
-		if strings.Contains(err.Error(), "no dress garments found") ||
-			strings.Contains(err.Error(), "no accessories found") {
-
-			// En este caso, intentamos generar un outfit alternativo sin estas prendas
-			// Nota: Esta lógica tendría que estar implementada en el servicio OutfitGeneratorService
-			// para permitir generación de outfits con prendas opcionales faltantes
-
-			// Por ahora devolvemos una respuesta que indica que faltan prendas opcionales
-			return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-				"status": "success",
-				"data": fiber.Map{
-					"outfit":   nil,
-					"garments": []*models.Garment{},
-					"message":  "Some optional garments are missing, but you can still add more variety to your wardrobe.",
-				},
-			})
-		}
-
-		// Para otros tipos de errores, mantener el comportamiento original
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
 			"message": err.Error(),
 		})
 	}
 
-	// El resto del código permanece igual...
+	// Guardar el outfit si se solicita
 	if ctx.Query("save", "false") == "true" {
 		savedOutfit, err := h.repository.AddOutfit(context, outfit)
 		if err != nil {
@@ -286,6 +298,20 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 				},
 			})
 		}
+
+		// Añadir el outfit al closet
+		err = h.closetRepository.AddOutfitToCloset(context, closetID, savedOutfit.ID)
+		if err != nil {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"status":  "partial_success",
+				"message": "Outfit saved but not added to closet",
+				"data": fiber.Map{
+					"outfit":   savedOutfit,
+					"garments": garments,
+				},
+			})
+		}
+
 		outfit = savedOutfit
 	}
 
@@ -298,22 +324,21 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 	})
 }
 
-func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository, garmentRepository models.GarmentRepository) {
+func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository, garmentRepository models.GarmentRepository, closetRepository models.ClosetRepository) {
 	outfitGenerator := services.NewOutfitGeneratorService(garmentRepository)
 
 	handler := &OutfitHandler{
-		repository:      repository,
-		outfitGenerator: outfitGenerator,
+		repository:        repository,
+		garmentRepository: garmentRepository,
+		closetRepository:  closetRepository,
+		outfitGenerator:   outfitGenerator,
 	}
 
 	router.Post("/", handler.CreateOutfit)
-
 	router.Patch("/:id", handler.UpdateOutfit)
 	router.Patch("/:id/archive", handler.ArchiveOutfit)
-
 	router.Get("/", handler.GetOutfitsByUser)
 	router.Get("/generate", handler.GenerateRandomOutfit)
 	router.Get("/:id", handler.GetOutfit)
-
 	router.Delete("/:id", handler.DeleteOutfit)
 }
