@@ -1,14 +1,16 @@
 ## TODO
 
 ## Funciones en el frontend
+- [X] Corregir scroll
+- [X] Conectar la API para generar outfit aleatorio
 - [ ] Agregar logica para cargar mas de 18 prendas
-- [ ] Conectar la API para generar outfit aleatorio
 - [ ] Conectar la API para crear outift manualmente
-- [ ] Corregir scroll
+- [ ] Ventana para agregar closets
+- [ ] Agregar que pueda generar aleatoriamente una prenda en especifico de un outfits
 
 ## Funciones en el backend
 
-- [ ] Mejorar logica para outfit aleatorio
-- [ ] Mejorar labels para identificar mejor prendas como sneakers, accesorios, mochilas, pantalones
-- [ ] Mejorar datasets para pantalones, bottoms, sneakers, backpacks, y accesories
+- [X] Mejorar labels para identificar mejor prendas como sneakers, accesorios, mochilas, pantalones
+- [X] Mejorar datasets para pantalones, bottoms, sneakers, backpacks, y accesories
+- [X] Mejorar logica para outfit aleatorio
 - [ ] Arreglar token JWT para cuando el usuario no este dentro de la DB
