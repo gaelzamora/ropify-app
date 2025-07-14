@@ -1,7 +1,7 @@
 import { ApiResponse } from "./api"
 
 export type GarmentResponse = ApiResponse<{ message: string, data: Garment}>
-export type GarmentListResponse = ApiResponse<Garment[]>
+export type GarmentListResponse = ApiResponse<{"closet_name": string, "garments": Garment[]}>
 
 export type Garment = {
     id: string

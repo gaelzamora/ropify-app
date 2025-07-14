@@ -1,53 +1,58 @@
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl, TextInput, Image, TouchableWithoutFeedback } from "react-native";
 import React, { useCallback, useState } from "react";
-import { FontAwesome, Ionicons } from "@expo/vector-icons";
-import { Garment } from "@/types/garment";
-import { useAuth } from "@/context/AuthContext";
-import { garmentService } from "@/services/garment";
-import { useFocusEffect } from "expo-router";
-import * as ImagePicker from 'expo-image-picker'
-import {Camera} from 'expo-camera'
 import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
-import Modal from 'react-native-modal'
-import { Image } from 'expo-image'
-
-const garmentCategories = [
-    "all",
-    "top",
-    "bottom",
-    "dress",
-    "sneakers",
-    "accesories",
-    "backpack"
-]
+import { Closet } from "@/types/closet";
+import { closetService } from "@/services/closet";
+import { useAuth } from "@/context/AuthContext";
+import { router, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import Modal from "react-native-modal"
+import * as ImagePicker from "expo-image-picker"
 
 export default function ClosetScreen() {
-    const [activeClosetOption, setActiveClosetOption] = useState(garmentCategories[0])
-    const [clothes, setClothes] = useState<Garment[]>([])
+    // Closets
+    const [closets, setClosets] = useState<Closet[]>([])
     const [isLoading, setIsLoading] = useState(false)
-    const [isAnalyzing, setIsAnalyzing] = useState(false)
+    const [isOpenAdd, setIsOpenAdd] = useState(false)
+
+    const [closetName, setClosetName] = useState("");
+    const [closetImage, setClosetImage] = useState<any>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [closetToDelete, setClosetToDelete] = useState<string | null>(null);
+    const DELETE_MODE_DELAY = 180;
+    
+    const { user } = useAuth()
+
     const [refreshing, setRefreshing] = useState(false)
 
-    const [elementsSelected, setElementsSelected] = useState<string[]>([])
-    const [isDeleting, setIsDeleting] = useState(false)
+    const handleLongPress = (id: string) => {
+        setTimeout(() => {
+            setIsDeleteMode(true);
+            setClosetToDelete(id);
+        }, DELETE_MODE_DELAY);
+    };
 
-    const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null)
-    const [isOpenGarment, setIsOpenGarment] = useState(false)
-
-    const { user } = useAuth()
+    // Al salir del modo eliminación
+    const handleExitDeleteMode = () => {
+        setTimeout(() => {
+            setIsDeleteMode(false);
+            setClosetToDelete(null);
+        }, DELETE_MODE_DELAY);
+    };
 
     const onRefresh = useCallback(() => {
         setRefreshing(true)
-        fetchClothes(activeClosetOption.toLowerCase())
+        fetchClosets()
             .finally(() => setRefreshing(false))
-    }, [activeClosetOption])
+    }, [])
 
-
-    const fetchClothes = async (category: string) => {
+    const fetchClosets = async () => {
         try {
             setIsLoading(true)
-            const response = await garmentService.filterGarments(1, 18, user?.id, category)
-            setClothes(response.data)
+            const response = await closetService.getMany()
+            setClosets(response.data)
         } catch (error) {
             Alert.alert("Error: ", String(error))
         } finally {
@@ -55,242 +60,156 @@ export default function ClosetScreen() {
         }
     }
 
-    const fetchDeleteGarments = async (garments: string[]) => {
-        try {
-            await garmentService.deleteMultipleGarments(garments)
-
-            setElementsSelected([])
-            setIsDeleting(false)
-
-            await fetchClothes(activeClosetOption.toLowerCase())
-        } catch (error) {
-            Alert.alert("Error: ", String(error))
+    const pickImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+        });
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+            const asset = result.assets[0];
+            setClosetImage({
+                uri: asset.uri,
+                name: asset.fileName || "closet_image.jpg",
+                type: asset.type || "image/jpeg"
+            });
         }
-    }
+    };
 
-    const pushOnElementsSelected = (id: string) => {
-        if (!id) return
-
-        setElementsSelected((prevSelected: any) => {
-            if (prevSelected.includes(id)) {
-                return prevSelected.filter((item: string) => item !== id)
-            } else {
-                return [...prevSelected, id]
-            }
-        })
-    }
-
-    const takePhotoAndAnalyze = async () => {
-        setIsAnalyzing(true)
-
+    // Handler para crear closet
+    const handleCreateCloset = async () => {
+        if (!closetName || !closetImage) {
+            Alert.alert("Error", "Please provide a name and image.");
+            return;
+        }
+        setIsSubmitting(true);
         try {
-            const { status } = await Camera.requestCameraPermissionsAsync()
-            if (status !== 'granted') {
-                setIsAnalyzing(false)
-                Alert.alert('Se requieren permisos para la camara')
-                return
-            }
-            const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.5,
-            })
-    
-            if (result.canceled) {
-                setIsAnalyzing(false)
-                return
-            }
-            const imageUri = result.assets[0].uri
-            const response = await garmentService.analyzeGarmentImage(imageUri)
-            
-            await fetchClothes(activeClosetOption.toLowerCase())
-            if (response.status === 200) {
-                Alert.alert('Success', 'Imagen cargada y procesada por IA')
-            }
-        } catch (error) {
-            Alert.alert('Error', 'No se pudo analizar la imagen')
+            await closetService.createOne(closetName, closetImage);
+            setIsOpenAdd(false);
+            setClosetName("");
+            setClosetImage(null);
+            fetchClosets();
+        } catch (err: any) {
+            Alert.alert("Error", err.message || "Could not create closet.");
         } finally {
-            setIsAnalyzing(false)
+            setIsSubmitting(false);
         }
+    };
+
+    function onGoToClosetPage(id: string) {
+        router.push(`/(authed)/(tabs)/(closet)/closet/${id}`)
     }
 
-    useFocusEffect(useCallback(() => { fetchClothes(activeClosetOption.toLowerCase()) }, [activeClosetOption]))
-
-
+    useFocusEffect(useCallback(() => { fetchClosets() }, []))
+    
     return (
-        <>
-            <View style={styles.closetContainer}>
-                
-                <Text style={styles.title}>Closets</Text>
-                
-                <View style={styles.contentArea}>
-                    <View style={styles.categorySection}>
-                        <FlatList 
-                            data={garmentCategories}
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            keyExtractor={(item) => item}
-                            contentContainerStyle={{ 
-                                gap: 10
-                            }}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    onPress={() => setActiveClosetOption(item)}
-                                    style={[styles.itemContainer, activeClosetOption === item && styles.itemActive]}
-                                >
-                                    <Text 
-                                        style={[{ color: activeClosetOption === item ? "#" : "#777"}, styles.itemText]}
-                                    >
-                                        {item}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-                        />
-                    </View>
+        <View style={styles.closetContainer}>
+            <View
+                style={{ marginTop: 30 }}
+            >
+                {user?.firstName && user.lastName ? (
+                    <Text
+                        style={{ fontSize: 14, color: "#888", fontWeight: "400" }}
+                    >Hello: {user?.firstName + ' ' + user?.lastName}</Text>
+                ) : (
+                    <Text
+                        style={{ fontSize: 14, color: "#888", fontWeight: "400" }}
+                    >Hello: {user?.email}</Text>
+                )}
+                <Text style={styles.textMain}>Closet&apos;s</Text>
+            </View>
 
-                    <View style={styles.garmentSection}>
-                        <FlatList 
-                            data={clothes}
-                            keyExtractor={(item) => item.id.toString()}
-                            numColumns={3}
-                            contentContainerStyle={{
-                                alignContent: "center",
-                                justifyContent: 'flex-start',
-                                width: "100%"
-                            }}
-                            refreshControl={
-                                <RefreshControl 
-                                    refreshing={refreshing}
-                                    onRefresh={onRefresh}
-                                    colors={["#ee1e1e"]}
-                                    tintColor={"#ee1e1e"}   
-                                />
-                            }
-                            ListEmptyComponent={
-                                isLoading ? (
-                                    <View style={{ flex: 1, marginTop: "50%", alignItems: "center", justifyContent: "center", padding: 40 }}>
-                                        <ActivityIndicator size="large" color="#222" />
-                                    </View>
-                                ) : (
-                                    <View style={{ flex: 1, marginTop: "50%", justifyContent: "center", alignItems: "center", padding: 40 }}>
-                                        <FontAwesome name="tag" size={48} color="#7a7676" style={{ marginBottom: 10 }} />
-                                        <Text style={{ fontSize: 20, color: "#7a7676", fontWeight: "700", textAlign: "center" }}>No clothes saved.</Text>
-                                        <Text style={{ fontSize: 12, color: "#7a7676", textAlign: "center" }}>
-                                            You haven&apos;t saved any clothes yet, so we don&apos;t have anything to show you! Go save some!.
-                                        </Text>
-                                    </View>
-                                )
-                            }
-                            renderItem={({ item: garment }) => (
-                                <TouchableOpacity
-                                    style={styles.garmentContainer}
-                                    onPress={() => {
-                                        if (isDeleting) {
-                                            pushOnElementsSelected(garment.id)
-                                        } else {
-                                           setSelectedGarment(garment)
-                                           setIsOpenGarment(true)
-                                        }
-                                    } 
-                                }
+            <TouchableWithoutFeedback
+                disabled={!isDeleteMode}
+                onPress={() => {
+                    handleExitDeleteMode()
+                }}
+            >
+                <View style={{ flex: 1 }}>
+                    <FlatList 
+                        data={closets}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{
+                            alignContent: "center",
+                            justifyContent: "center",
+                            width: "100%",
+                            gap: 10,
+                            marginTop: 40
+                        }}
+                        ListEmptyComponent={
+                            isLoading ? (
+                                <View style={{ flex: 1, marginTop: "50%", alignItems: "center", justifyContent: "center", padding: 40 }}>
+                                    <ActivityIndicator size={"large"} color={"#222"} />
+                                </View>
+                            ) : (
+                                <View
+                                    style={styles.isEmpty}
                                 >
-                                    <SmartBackgroundRemoval
-                                        imageUri={garment.image_url}
-                                        boundingPoly={garment.boundingPoly}
+                                    <Ionicons 
+                                        name="cube-outline"
+                                        color={"#888"}
+                                        size={66}
                                     />
-                                    {isDeleting && (
-                                        <View style={styles.overlay}>
-                                            {elementsSelected.includes(garment.id) && (
-                                                <Ionicons 
-                                                    name="checkmark-circle" 
-                                                    size={25} 
-                                                    color={"#222"}
-                                                    style={{position: "absolute", left: 2, top: 2}}
-                                                />
-                                            )}
-                                        </View>
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                        />
-                    </View>
-                </View>
-                <View 
-                    style={{ 
-                        position: "absolute",
-                        left: 15,
-                        bottom: 15,
-                    }}
-                >
-                    <TouchableOpacity 
-                        style={styles.iconTouchable}
-                        onPress={takePhotoAndAnalyze}
-                    >
-                        <Ionicons   
-                            name={"scan"}
-                            size={28}
-                            color={"white"}
-                        />
-                    </TouchableOpacity>
-                </View>
-
-                <View 
-                    style={{ 
-                        position: "absolute",
-                        right: 15,
-                        bottom: 15,
-                    }}
-                >
-                    {elementsSelected.length > 0 && (
-                        <TouchableOpacity 
-                            style={[styles.iconTouchable, {bottom: 3}]}
-                            onPress={() => fetchDeleteGarments(elementsSelected)}
-                        >
-                            <Ionicons 
-                                name="trash-outline" 
-                                size={25} 
-                                color={"white"}  
+                                    <Text style={{ textAlign: "center", fontSize: 24, fontWeight: "bold", color: "#888" }}>Is Empty here</Text>
+                                </View>
+                            )
+                        }
+                        refreshControl={
+                            <RefreshControl 
+                                refreshing={refreshing}  
+                                onRefresh={onRefresh}
+                                colors={["#222"]}
+                                tintColor={"#222"}                    
                             />
-                        </TouchableOpacity>
-                    )}
-
-                    {clothes.length > 0 && (
-                        <TouchableOpacity 
-                            style={[styles.iconTouchable, isDeleting ? {backgroundColor: "white"} : {}]}
-                            onPress={() => {
-                                if (isDeleting) setElementsSelected([])
-                                setIsDeleting(!isDeleting)}
-                            }   
-                        >
-                            <Ionicons 
-                                name="ban-outline" 
-                                size={25} 
-                                color={isDeleting ? "#222" : "white"}  
-                            />
-                        </TouchableOpacity>
-                    )}
-
+                        }
+                        renderItem={({ item: closet }) => (
+                            <TouchableOpacity
+                                style={styles.itemContainer}
+                                onPress={() => onGoToClosetPage(closet.id)}
+                                onLongPress={() => {
+                                    handleLongPress(closet.id)
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <SmartBackgroundRemoval imageUri={closet.image_url} />
+                                {isDeleteMode && closetToDelete === closet.id && (
+                                    <View style={styles.deleteOverlay}>
+                                        <TouchableOpacity
+                                            style={styles.trashButton}
+                                            onPress={async () => {
+                                                await closetService.deleteOne(closet.id);
+                                                setIsDeleteMode(false);
+                                                setClosetToDelete(null);
+                                                fetchClosets();
+                                            }}
+                                        >
+                                            <Ionicons name="trash" size={32} color="#222" />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    />
                 </View>
+            </TouchableWithoutFeedback>
             
 
-            </View>
-                {isAnalyzing && (
-                    <View style={styles.overlay}>
-                        <ActivityIndicator size={"large"} color={"#fff"} />
-                    </View>
-                )}
+            <TouchableOpacity
+                style={styles.iconAddCloset}
+                onPress={() => setIsOpenAdd(true)}
+            >
+                <Ionicons   
+                    name={"add-outline"}
+                    size={28}
+                    color={"white"}
+                />
 
-            {/* Show garment image as modal component */}
+            </TouchableOpacity>
+
             <Modal
-                isVisible={isOpenGarment}
-                onBackdropPress={() => {
-                    setIsOpenGarment(false);
-                    setTimeout(() => setSelectedGarment(null), 300);
-                }}
-                onSwipeComplete={() => {
-                    setIsOpenGarment(false);
-                    setTimeout(() => setSelectedGarment(null), 300);
-                }}
+                isVisible={isOpenAdd}
+                onBackdropPress={() => setIsOpenAdd(false)}
+                onSwipeComplete={() => setIsOpenAdd(false)}
                 swipeDirection={['down']}
                 backdropOpacity={0.7}
                 animationIn="zoomIn"
@@ -299,183 +218,111 @@ export default function ClosetScreen() {
                 animationOutTiming={300}
                 style={styles.modal}
             >
-                <View style={styles.modalContent}>
-                    {selectedGarment && (
-                        <>
-                            <TouchableOpacity 
-                                style={styles.closeButton} 
-                                onPress={() => {
-                                    setIsOpenGarment(false);
-                                    setTimeout(() => setSelectedGarment(null), 300);
-                                }}
-                            >
-                                <Ionicons name="close" size={24} color="#fff" />
-                            </TouchableOpacity>
-                            
-                            <View style={styles.garmentImageContainer}>
-                                <Image
-                                    source={selectedGarment.image_url}
-                                    style={{ width: '100%', height: 300, borderRadius: 10 }}
-                                    contentFit="contain"
-                                    transition={300}
-                                />
-                            </View>
-                        </>
+                <View style={{ width: 300, backgroundColor: "#fff", borderRadius: 12, padding: 20 }}>
+                    <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10 }}>New Closet</Text>
+                    <TextInput
+                        placeholder="Name"
+                        placeholderTextColor={"#888"}
+                        value={closetName}
+                        onChangeText={setClosetName}
+                        style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 15 }}
+                    />
+                    <TouchableOpacity
+                        style={{
+                            backgroundColor: "#222",
+                            padding: 12,
+                            borderRadius: 8,
+                            alignItems: "center",
+                            marginBottom: 10,
+                        }}
+                        onPress={pickImage}
+                    >
+                        <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                            {closetImage ? "Change Image" : "Pick Image"}
+                        </Text>
+                    </TouchableOpacity>
+                    {closetImage && (
+                        <View style={{ marginTop: "50%", alignItems: "center", marginBottom: 10 }}>
+                            <Text style={{ fontSize: 12, marginBottom: 5 }}>{closetImage.name}</Text>
+                            <Image 
+                                source={ closetImage.uri } 
+                                style={{ width: 80, height: 80, borderRadius: 8 }} 
+                            />
+                        </View>
                     )}
+                    <TouchableOpacity
+                        style={{
+                            backgroundColor: "#222",
+                            padding: 12,
+                            borderRadius: 8,
+                            alignItems: "center",
+                            marginTop: 10
+                        }}
+                        onPress={handleCreateCloset}
+                        disabled={isSubmitting}
+                    >
+                        <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                            {isSubmitting ? "Creating..." : "Create"}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </Modal>
-        </>
+            
+        </View>            
     )
 }
 
 const styles = StyleSheet.create({
     closetContainer: {
         flex: 1,
-        paddingVertical: 50,
-        paddingHorizontal: 20,
-        position: 'relative'
+        paddingVertical: 20,
+        paddingHorizontal: 50,
+        position: 'relative',
+        backgroundColor: "white"
     },
-    title: {
-        fontSize: 30, 
-        fontWeight: "600",
-        marginBottom: 10
-    },
-    contentArea: {
-        flex: 1,
-        flexDirection: 'column',
-    },
-    categorySection: {
-        height: 60, 
-    },
-    garmentSection: {
-        flex: 1, 
-        height: "100%"
-    },
-    itemText: {
-        fontWeight: "600", 
-        textTransform: "capitalize", 
-        textAlign: "center"
+    textMain: {
+        fontSize: 40,
+        fontWeight: "700"
     },
     itemContainer: {
-        paddingHorizontal: 15,
-        paddingVertical: 6,
-        height: 50,
+        width: "100%",
+        height: "auto",
     },
-    itemActive: {
-        borderColor: "#353333",
-        borderBottomWidth: 3
-    },
-    garmentContainer: {
-        width: '30%',
-        aspectRatio: 1,
-        margin: 5,
-        backgroundColor: 'transparent', 
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: 'hidden',
-        borderRadius: 15,
-        position: "relative"
-    },
-    garmentImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: "cover",
-        // Sombra para iOS:
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        // Sombra para Android:
-        elevation: 5,
-    },
-    iconTouchable: {
+    iconAddCloset: {
+        position: "absolute",
+        bottom: 0,
+        alignSelf: "center",
         backgroundColor: "#353333", 
         width: 50, 
-        height: 50, 
-        flex: 1, 
-        alignItems: "center", 
+        height: 50,
         justifyContent: "center",
+        alignItems: "center",
         borderRadius: 99
-    },
-    modelContent: {
-        backgroundColor:"white",
-        padding: 20,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        height: "80%"
-    },
-    processedBadge: {
-        position: 'absolute',
-        bottom: 5,
-        right: 5,
-        backgroundColor: 'rgba(238, 30, 30, 0.8)',
-        borderRadius: 10,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-    },
-    processedText: {
-        color: 'white',
-        fontSize: 8,
-        fontWeight: 'bold',
-    },
-    overlay: {
-        position: "absolute",
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     modal: {
         margin: 0,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    modalContent: {
-        backgroundColor: 'white',
-        borderRadius: 15,
-        padding: 20,
-        width: '85%',
-        maxHeight: '80%',
-        alignItems: 'center',
+    deleteOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 2,
+        borderRadius: 25
     },
-    closeButton: {
-        position: 'absolute',
-        top: -10,
-        right: -10,
-        backgroundColor: '#222',
-        borderRadius: 15,
-        width: 30,
-        height: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10,
+    trashButton: {
+        backgroundColor: "#fff",
+        padding: 18,
+        borderRadius: 40,
+        alignItems: "center",
+        justifyContent: "center",
     },
-    garmentImageContainer: {
-        width: '100%',
-        height: 300,
-        marginBottom: 20,
-        borderRadius: 10,
-        overflow: 'hidden',
-    },
-    garmentDetails: {
-        width: '100%',
-        padding: 10,
-    },
-    garmentName: {
-        fontSize: 22,
-        fontWeight: '700',
-        marginBottom: 8,
-        color: '#222',
-    },
-    garmentCategory: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 5,
-    },
-    garmentInfo: {
-        fontSize: 14,
-        color: '#777',
-        marginBottom: 3,
-    },
+    isEmpty: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: "60%"
+    }
 })

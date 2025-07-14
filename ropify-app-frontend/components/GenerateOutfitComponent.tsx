@@ -1,0 +1,226 @@
+import React, { useCallback, useState } from "react"
+import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Text } from "react-native"
+import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import Modal from 'react-native-modal'
+import { outfitService } from "@/services/outfit";
+import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
+import { Garment } from "@/types/garment";
+import { Closet } from "@/types/closet";
+import { closetService } from "@/services/closet";
+import { useFocusEffect } from "expo-router";
+
+type ComponentProps = {
+    isModalOutfitGeneratedActive: boolean
+    setIsModalOutfitGeneratedActive: (state: boolean) => void
+}
+
+export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, setIsModalOutfitGeneratedActive }: ComponentProps) {
+    const [save, setSave] = useState(false)
+    const [isLoadingRandomOutfit, setIsLoadingRandomOutfit] = useState(false)
+    const [outfitRandom, setOutfitRandom] = useState<Garment[]>([])
+    const [closetSelected, setClosetSelected] = useState<string | null>(null)
+    const [closets, setClosets] = useState<Closet[]>([])
+    const [isLoadingClosets, setIsLoadingClosets] = useState(false)
+
+    const [viewMode, setViewMode] = useState<"closets" | "outfit">("closets");
+
+    // Cuando seleccionas un closet:
+    const handleSelectCloset = (closetId: string) => {
+        setClosetSelected(closetId);
+        setViewMode("outfit");
+        setOutfitRandom([]); // Limpia el outfit anterior si lo deseas
+    };
+
+    // Para volver a la vista de closets:
+    const handleBackToClosets = () => {
+        setViewMode("closets");
+        setClosetSelected(null);
+        setOutfitRandom([]);
+    };
+
+    const fetchGenerateRandomOutfit = async (closet_id: string, save: boolean) => {
+        try {
+            setIsLoadingRandomOutfit(true)
+            const response = await outfitService.generateRandomOutfit(closet_id, save)
+            setOutfitRandom(response.data.garments)
+        } catch (error) {
+            Alert.alert("Error: ", String(error))
+        } finally {
+            setIsLoadingRandomOutfit(false)
+        }
+    }
+
+    const fetchClosets = async () => {
+            try {
+                setIsLoadingClosets(true)
+                const response = await closetService.getMany()
+                setClosets(response.data)
+            } catch (error) {
+                Alert.alert("Error: ", String(error))
+            } finally {
+                setIsLoadingClosets(false)
+            }
+    }
+
+    useFocusEffect(useCallback(() => { fetchClosets() }, []))
+
+    return (
+        <Modal
+            isVisible={isModalOutfitGeneratedActive}
+            onBackdropPress={() => setIsModalOutfitGeneratedActive(false)}
+            onSwipeComplete={() => setIsModalOutfitGeneratedActive(false)}
+            swipeDirection={['down']}
+            backdropOpacity={0.7}
+            animationIn="slideInUp"
+            animationOut="slideOutDown"
+            animationInTiming={300}
+            animationOutTiming={300}
+            style={styles.modal}
+        >
+            <View style={styles.modalContent}>
+                <View style={styles.dragIndicator} />
+                <View style={styles.contentRandomOutfit}>
+                    {viewMode === "closets" && (
+                        <>
+                            <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20, color: "#222" }}>Select an outfit</Text>
+                            <FlatList
+                                data={closets}
+                                keyExtractor={(item) => item.id.toString()}
+                                numColumns={2}
+                                columnWrapperStyle={{ gap: 5 }}
+                                contentContainerStyle={{
+                                    alignContent: "center",
+                                    justifyContent: "flex-start",
+                                    width: "100%",
+                                }}
+                                ListEmptyComponent={
+                                    isLoadingClosets ? (
+                                        <View style={{ alignItems: "center", justifyContent: "center", padding: 20, marginTop: "50%" }}>
+                                            <ActivityIndicator size={"large"} color={"#222"} />
+                                        </View>
+                                    ) : (
+                                        <View style={{ alignItems: "center", justifyContent: "center", padding: 20, marginTop: "50%" }}>
+                                            <FontAwesome name="random" size={48} color={"#888"} style={{ marginBottom: 10 }} />
+                                            <Text style={styles.secundaryText}>Is Empty</Text>
+                                        </View>
+                                    )
+                                }
+                                renderItem={({ item: closet }) => (
+                                    <TouchableOpacity
+                                        onPress={() => handleSelectCloset(closet.id)}
+                                        style={styles.garmentContainer}
+                                    >
+                                        <SmartBackgroundRemoval imageUri={closet.image_url} />
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        </>
+                    )}
+
+                    {viewMode === "outfit" && (
+                        <>
+                            <TouchableOpacity
+                                style={{ position: "absolute", left: 10, top: 0, padding: 10, zIndex: 10 }}
+                                onPress={handleBackToClosets}
+                            >
+                                <Ionicons name="arrow-back" size={28} color="#222" />
+                            </TouchableOpacity>
+                            <FlatList
+                                data={outfitRandom}
+                                keyExtractor={(item) => item.id.toString()}
+                                numColumns={3}
+                                contentContainerStyle={{
+                                    alignContent: "center",
+                                    justifyContent: "flex-start",
+                                    width: "100%",
+                                    marginTop: 40
+                                }}
+                                ListEmptyComponent={
+                                    isLoadingRandomOutfit ? (
+                                        <View style={{ alignItems: "center", justifyContent: "center", padding: 20, marginTop: "50%" }}>
+                                            <ActivityIndicator size={"large"} color={"#222"} />
+                                        </View>
+                                    ) : (
+                                        <View style={{ alignItems: "center", justifyContent: "center", padding: 20, marginTop: "50%" }}>
+                                            <FontAwesome name="random" size={48} color={"#888"} style={{ marginBottom: 10 }} />
+                                            <Text style={styles.secundaryText}>Generate an outfit</Text>
+                                        </View>
+                                    )
+                                }
+                                renderItem={({ item: garment }) => (
+                                    <TouchableOpacity style={styles.garmentContainer}>
+                                        <SmartBackgroundRemoval imageUri={garment.image_url} boundingPoly={garment.boundingPoly} />
+                                    </TouchableOpacity>
+                                )}
+                            />
+                            {closetSelected && (
+                                <TouchableOpacity
+                                    style={styles.buttonGenerate}
+                                    onPress={() => fetchGenerateRandomOutfit(closetSelected, save)}
+                                >
+                                    <Text style={{ color: "white", fontSize: 18 }}>Generate Outfit</Text>
+                                </TouchableOpacity>
+                            )}
+                        </>
+                    )}
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+
+const styles = StyleSheet.create({
+    modal: {
+        margin: 0,
+        justifyContent: 'flex-end',
+        position: "relative"
+    },
+    modalContent: { 
+        backgroundColor: 'white',
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        width: '100%',
+        height: '80%',
+        paddingTop: 15,
+        position: "relative"
+    },
+    dragIndicator: {
+        width: 60,
+        height: 5,
+        backgroundColor: '#ccc',
+        borderRadius: 3,
+        marginBottom: 10,
+        alignSelf: 'center',
+    },
+    contentRandomOutfit: {
+        flex: 1,
+        paddingHorizontal: 14,
+        position: "relative"
+    },
+    buttonGenerate: {
+        paddingHorizontal: 100,
+        paddingVertical: 16,
+        backgroundColor: "#222",
+        borderRadius: 10,
+        position: "absolute",
+        bottom: 40,
+        alignSelf: "center"
+    },
+    garmentContainer: {
+        flex: 1,
+        aspectRatio: 1,
+        margin: 5,
+        backgroundColor: 'transparent', 
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: 'hidden',
+        borderRadius: 15,
+        position: "relative"
+    },
+    secundaryText: {
+        fontSize: 14, 
+        color: "#888", 
+        fontWeight: "600"
+    }
+})

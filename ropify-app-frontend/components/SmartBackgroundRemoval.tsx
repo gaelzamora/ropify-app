@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: 25,
     overflow: 'hidden',
     backgroundColor: 'white',
   },

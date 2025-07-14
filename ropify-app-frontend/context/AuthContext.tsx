@@ -112,7 +112,6 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
             }
         } catch (error) {
             console.error("Google authentication failed:", error);
-            // Mostrar un toast o alerta al usuario
         } finally {
             setIsLoadingAuth(false);
         }
