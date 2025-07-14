@@ -24,7 +24,7 @@ func main() {
 	})
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:8081,http://192.168.1.78:8081",
+		AllowOrigins:     "http://localhost:8081,http://192.168.1.6z8:8081",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowCredentials: true,
@@ -39,7 +39,7 @@ func main() {
 	// Service
 	authService := services.NewAuthService(authRepository)
 	oauthService := services.NewOAuthService(authRepository)
-	outfitService := services.NewOutfitGeneratorService(garmentRepository)
+	outfitService := services.NewOutfitGeneratorService(garmentRepository, closetRepository)
 
 	server := app.Group("/api")
 
@@ -47,7 +47,7 @@ func main() {
 	handlers.NewAuthHandler(server.Group("/auth"), authService)
 	handlers.NewOAuthHandler(server.Group("/oauth"), oauthService)
 
-	// Private route to verify if user is authenticated
+	// Private route to verify if user is authenticatedw
 	privateRoutes := server.Use(middlewares.AuthProtected(db))
 
 	handlers.NewGarmentHandler(privateRoutes.Group("/garment"), garmentRepository)

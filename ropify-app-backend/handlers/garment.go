@@ -404,120 +404,6 @@ func (h *GarmentHandler) LookupByBarcode(ctx *fiber.Ctx) error {
 	})
 }
 
-func (h *GarmentHandler) AnalyzeAndCreateGarment(ctx *fiber.Ctx) error {
-	userIdStr := ctx.Locals("userId").(string)
-	userId, err := uuid.Parse(userIdStr)
-
-	if err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Invalid user ID",
-		})
-	}
-
-	file, err := ctx.FormFile("image")
-	if err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "No image provided",
-		})
-	}
-
-	fileContent, err := file.Open()
-	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Error opening image",
-		})
-	}
-	defer fileContent.Close()
-
-	imageBytes, err := io.ReadAll(fileContent)
-	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Error reading image",
-		})
-	}
-
-	visionResult, err := services.AnalyzeGarmentImage(imageBytes)
-	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Error analying image: " + err.Error(),
-		})
-	}
-
-	imageBytesNoBg, err := services.RemoveBackground(imageBytes)
-	if err != nil {
-		fmt.Println("Failed to remove background, Original image will be used: ", err)
-		imageBytesNoBg = imageBytes
-	} else {
-		fmt.Println("Imagen received from RemoveBackground: ", len(imageBytesNoBg))
-	}
-
-	key := fmt.Sprintf("garments/users/%s", userId.String())
-	imageURL, err := services.UploadToS3Bytes(imageBytesNoBg, key, file.Filename)
-	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Error uploading image to S3",
-		})
-	}
-
-	var category models.GarmentCategory
-	switch visionResult.MainCategory {
-	case "top":
-		category = models.Top
-	case "bottom":
-		category = models.Bottoms
-	case "dress":
-		category = models.Dress
-	case "sneakers":
-		category = models.Sneakers
-	case "accessories":
-		category = models.Accesories
-	case "backpack":
-		category = models.Backpack
-	default:
-		category = models.Accesories
-	}
-
-	color := "unknown"
-	if len(visionResult.Colors) > 0 {
-		color = visionResult.Colors[0].Hex
-	}
-
-	garment := models.Garment{
-		UserID:     userId,
-		Category:   category,
-		Color:      color,
-		Labels:     visionResult.Labels,
-		ImageURL:   imageURL,
-		IsVerified: true,
-		CreatedAt:  time.Now(),
-	}
-
-	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	newGarment, err := h.repository.AddGarment(context, &garment)
-	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Error al crear prenda: " + err.Error(),
-		})
-	}
-
-	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"status": "success",
-		"data": fiber.Map{
-			"garment":  newGarment,
-			"analysis": visionResult,
-		},
-	})
-}
-
 func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository) {
 	handler := &GarmentHandler{
 		repository: repository,
@@ -525,7 +411,6 @@ func NewGarmentHandler(router fiber.Router, repository models.GarmentRepository)
 
 	router.Post("/", handler.AddGarment)
 	router.Post("/barcode", handler.LookupByBarcode)
-	router.Post("/analyze", handler.AnalyzeAndCreateGarment)
 	router.Post("/:id", handler.UploadGarmentImage)
 
 	router.Get("/", handler.FilterGarments)

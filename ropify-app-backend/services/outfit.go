@@ -19,9 +19,10 @@ type OutfitGeneratorService struct {
 	closetRepository  models.ClosetRepository
 }
 
-func NewOutfitGeneratorService(garmentRepository models.GarmentRepository) *OutfitGeneratorService {
+func NewOutfitGeneratorService(garmentRepository models.GarmentRepository, closetRepository models.ClosetRepository) *OutfitGeneratorService {
 	return &OutfitGeneratorService{
 		garmentRepository: garmentRepository,
+		closetRepository:  closetRepository,
 	}
 }
 
@@ -191,7 +192,6 @@ func (s *OutfitGeneratorService) validateOutfit(garments []*models.Garment) bool
 
 // GenerateRandomOutfit crea un outfit aleatorio basado en colores y etiquetas compatibles
 func (s *OutfitGeneratorService) GenerateRandomOutfitFromCloset(ctx context.Context, closetID uuid.UUID) (*models.Outfit, []*models.Garment, error) {
-	// 1. Obtener categorías esenciales del closet
 	tops, err := s.closetRepository.GetGarmentsByCategoryAndCloset(ctx, closetID, "top", 10)
 	if err != nil || len(tops) == 0 {
 		return nil, nil, fmt.Errorf("no top garments found in this closet")
@@ -245,6 +245,9 @@ func (s *OutfitGeneratorService) GenerateRandomOutfitFromCloset(ctx context.Cont
 	if len(matchingBottoms) == 0 {
 		matchingBottoms = bottoms
 	}
+	if len(matchingBottoms) == 0 {
+		return nil, nil, fmt.Errorf("no matching bottoms found in this closet")
+	}
 
 	bottom := matchingBottoms[rand.Intn(len(matchingBottoms))]
 	baseGarments = append(baseGarments, bottom)
@@ -279,6 +282,9 @@ func (s *OutfitGeneratorService) GenerateRandomOutfitFromCloset(ctx context.Cont
 	matchingShoes := s.filterByColorMatch(baseForShoe, compatibleShoes)
 	if len(matchingShoes) == 0 {
 		matchingShoes = compatibleShoes
+	}
+	if len(matchingShoes) == 0 {
+		return nil, nil, fmt.Errorf("no matching shoes found in this closet")
 	}
 
 	shoe := matchingShoes[rand.Intn(len(matchingShoes))]

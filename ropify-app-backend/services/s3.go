@@ -39,6 +39,40 @@ func UploadToS3Bytes(imageBytes []byte, destiny, filename string) (string, error
 
 // DeleteFromS3 elimina un objeto de S3 usando su clave
 func DeleteFromS3(objectKey string) error {
+	// Crear sesión de AWS
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String(os.Getenv("AWS_REGION")),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create AWS session: %v", err)
+	}
+
+	// Crear servicio S3
+	svc := s3.New(sess)
+
+	// Eliminar el objeto
+	_, err = svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(os.Getenv("AWS_BUCKET_NAME")),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete S3 object: %v", err)
+	}
+
+	// Esperar hasta que el objeto esté realmente eliminado
+	err = svc.WaitUntilObjectNotExists(&s3.HeadObjectInput{
+		Bucket: aws.String(os.Getenv("AWS_BUCKET_NAME")),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return fmt.Errorf("error waiting for object to be deleted: %v", err)
+	}
+
+	return nil
+}
+
+// DeleteS3Folder elimina todos los objetos con el prefijo especificado (simulando eliminar una carpeta)
+func DeleteS3Folder(prefix string) error {
     // Crear sesión de AWS
     sess, err := session.NewSession(&aws.Config{
         Region: aws.String(os.Getenv("AWS_REGION")),
@@ -46,40 +80,60 @@ func DeleteFromS3(objectKey string) error {
     if err != nil {
         return fmt.Errorf("failed to create AWS session: %v", err)
     }
-    
+
     // Crear servicio S3
     svc := s3.New(sess)
+    bucketName := os.Getenv("AWS_BUCKET_NAME")
+
+    // Listar todos los objetos con el prefijo dado
+    var objectsToDelete []*s3.ObjectIdentifier
     
-    // Eliminar el objeto
-    _, err = svc.DeleteObject(&s3.DeleteObjectInput{
-        Bucket: aws.String(os.Getenv("AWS_BUCKET_NAME")),
-        Key:    aws.String(objectKey),
+    err = svc.ListObjectsV2Pages(&s3.ListObjectsV2Input{
+        Bucket: aws.String(bucketName),
+        Prefix: aws.String(prefix),
+    }, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+        for _, obj := range page.Contents {
+            objectsToDelete = append(objectsToDelete, &s3.ObjectIdentifier{
+                Key: obj.Key,
+            })
+        }
+        return true // continuar paginando
     })
+
     if err != nil {
-        return fmt.Errorf("failed to delete S3 object: %v", err)
+        return fmt.Errorf("error listing S3 objects: %v", err)
     }
-    
-    // Esperar hasta que el objeto esté realmente eliminado
-    err = svc.WaitUntilObjectNotExists(&s3.HeadObjectInput{
-        Bucket: aws.String(os.Getenv("AWS_BUCKET_NAME")),
-        Key:    aws.String(objectKey),
+
+    // Si no hay objetos que eliminar, terminar
+    if len(objectsToDelete) == 0 {
+        return nil
+    }
+
+    // Eliminar todos los objetos en un solo lote
+    _, err = svc.DeleteObjects(&s3.DeleteObjectsInput{
+        Bucket: aws.String(bucketName),
+        Delete: &s3.Delete{
+            Objects: objectsToDelete,
+            Quiet:   aws.Bool(false),
+        },
     })
+
     if err != nil {
-        return fmt.Errorf("error waiting for object to be deleted: %v", err)
+        return fmt.Errorf("error deleting S3 objects: %v", err)
     }
-    
+
     return nil
 }
 
 // ExtractS3KeyFromURL extrae la clave de un objeto de la URL de S3
 func ExtractS3KeyFromURL(url string) (string, error) {
-    // Las URLs de S3 suelen tener este formato:
-    // https://bucket-ropify.s3.us-east-2.amazonaws.com/garments/users/userid/filename.jpg
-    
-    parts := strings.Split(url, ".amazonaws.com/")
-    if len(parts) != 2 {
-        return "", fmt.Errorf("invalid S3 URL format")
-    }
-    
-    return parts[1], nil
+	// Las URLs de S3 suelen tener este formato:
+	// https://bucket-ropify.s3.us-east-2.amazonaws.com/garments/users/userid/filename.jpg
+
+	parts := strings.Split(url, ".amazonaws.com/")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid S3 URL format")
+	}
+
+	return parts[1], nil
 }

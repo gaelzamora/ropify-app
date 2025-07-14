@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -226,22 +227,15 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 		})
 	}
 
-	// REQUERIR closet_id (ya no es opcional)
-	closetIDStr := ctx.Query("closet_id", "")
-	if closetIDStr == "" {
-		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status":  "fail",
-			"message": "Closet ID is required",
-		})
-	}
-
-	closetID, err := uuid.Parse(closetIDStr)
+	closetID, err := uuid.Parse(ctx.Params("closetId"))
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
 			"message": "Invalid closet ID",
 		})
 	}
+
+	fmt.Println("Closet ID: ", closetID)
 
 	// Verificar que el closet existe y pertenece al usuario
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -325,7 +319,7 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 }
 
 func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository, garmentRepository models.GarmentRepository, closetRepository models.ClosetRepository) {
-	outfitGenerator := services.NewOutfitGeneratorService(garmentRepository)
+	outfitGenerator := services.NewOutfitGeneratorService(garmentRepository, closetRepository)
 
 	handler := &OutfitHandler{
 		repository:        repository,
@@ -338,7 +332,7 @@ func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository, g
 	router.Patch("/:id", handler.UpdateOutfit)
 	router.Patch("/:id/archive", handler.ArchiveOutfit)
 	router.Get("/", handler.GetOutfitsByUser)
-	router.Get("/generate", handler.GenerateRandomOutfit)
+	router.Get("/generate/:closetId", handler.GenerateRandomOutfit)
 	router.Get("/:id", handler.GetOutfit)
 	router.Delete("/:id", handler.DeleteOutfit)
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
+	"github.com/gaelzamora/ropify-app/services"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -73,10 +74,45 @@ func (r *ClosetRepository) DeleteCloset(ctx context.Context, id uuid.UUID) error
 		return tx.Error
 	}
 
+	// Primero, obtener todas las prendas asociadas a este closet
+	var garmentIDs []uuid.UUID
+	if err := tx.Table("closet_garments").
+		Where("closet_id = ?", id).
+		Pluck("garment_id", &garmentIDs).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	// Eliminar las relaciones con garments
 	if err := tx.Where("closet_id = ?", id).Delete(&models.ClosetGarment{}).Error; err != nil {
 		tx.Rollback()
 		return err
+	}
+
+	// Para cada prenda, verificar si pertenece a otro closet antes de eliminarla
+	for _, garmentID := range garmentIDs {
+		var count int64
+		if err := tx.Model(&models.ClosetGarment{}).
+			Where("garment_id = ?", garmentID).
+			Count(&count).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		// Si la prenda no pertenece a ningún otro closet, eliminarla
+		if count == 0 {
+			var garment models.Garment
+			if err := tx.First(&garment, "id = ?", garmentID).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+			services.DeleteFromS3(garment.ImageURL)
+
+			if err := tx.Delete(&models.Garment{}, "id = ?", garmentID).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
 	}
 
 	// Eliminar el closet
@@ -103,6 +139,34 @@ func (r *ClosetRepository) RemoveGarmentFromCloset(ctx context.Context, closetID
 	return r.db.WithContext(ctx).
 		Where("closet_id = ? AND garment_id = ?", closetID, garmentID).
 		Delete(&models.ClosetGarment{}).Error
+}
+
+// FilterGarmentsByCloset permite filtrar prendas de un closet con multiples criterios y paginacion
+func (r *ClosetRepository) FilterGarmentsByCloset(ctx context.Context, closetID uuid.UUID, filters map[string]interface{}, sortBy string, limit, offset int) ([]*models.Garment, error) {
+	var garments []*models.Garment
+
+	query := r.db.WithContext(ctx).
+		Table("garments").
+		Joins("JOIN closet_garments ON garments.id = closet_garments.garment_id").
+		Where("closet_garments.closet_id = ?", closetID)
+
+	// Aplicar filtros con el nombre correcto de la tabla
+	for key, value := range filters {
+		query = query.Where("garments."+key+" = ?", value)
+	}
+
+	// Ordenar con el nombre correcto de la tabla
+	if sortBy != "" {
+		query = query.Order("garments." + sortBy + " DESC")
+	}
+
+	// Aplicar paginación
+	query = query.Limit(limit).Offset(offset)
+
+	// Ejecutar consulta
+	err := query.Find(&garments).Error
+
+	return garments, err
 }
 
 // GetGarmentsByCloset obtiene todas las prendas de un closet
