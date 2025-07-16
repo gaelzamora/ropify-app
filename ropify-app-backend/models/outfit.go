@@ -2,24 +2,45 @@ package models
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
+type GarmentOptimized struct {
+	ID       uuid.UUID `json:"id"`
+	ImageURL string    `json:"image_url"`
+}
+
+type GarmentOptimizedArray []GarmentOptimized
+
+func (a GarmentOptimizedArray) Value() (driver.Value, error) {
+	return json.Marshal(a)
+}
+
+func (a *GarmentOptimizedArray) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+
+	if !ok {
+		return fmt.Errorf("failed to unmarshal GarmentOptimizedArray value")
+	}
+
+	return json.Unmarshal(bytes, a)
+}
+
 type Outfit struct {
-	ID         uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
-	UserID     uuid.UUID      `json:"user_id" gorm:"type:uuid;not null"`
-	Name       string         `json:"name" gorm:"not null"`
-	GarmentIDs pq.StringArray `json:"garment_ids" gorm:"type:uuid[]"`
-	Tags       pq.StringArray `json:"tags" gorm:"type:text[]"`
-	Occasion   string         `json:"occasion"`
-	Season     string         `json:"season"`
-	Archived   bool           `json:"archived" gorm:"default:false"`
-	ImageURL   string         `json:"image_url"`
-	CreatedAt  time.Time      `json:"created_at"`
+	ID        uuid.UUID             `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	UserID    uuid.UUID             `json:"user_id" gorm:"type:uuid;not null"`
+	Name      string                `json:"name" gorm:"not null"`
+	Garments  GarmentOptimizedArray `json:"garment_ids" gorm:"type:jsonb"`
+	Occasion  string                `json:"occasion"`
+	Archived  bool                  `json:"archived" gorm:"default:false"`
+	ImageURL  string                `json:"image_url"`
+	CreatedAt time.Time             `json:"created_at"`
 }
 
 type OutfitRepository interface {

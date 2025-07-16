@@ -7,11 +7,6 @@ export default function TabLayout() {
 
     const tabs = [
         {
-            name: "(feed)",
-            displayName: "Feed",
-            icon: "flame",
-        },
-        {
             name: "(closet)",
             displayName: "Closet",
             icon: "pricetag",
@@ -48,9 +43,9 @@ export default function TabLayout() {
                         key={tab.name}
                         name={tab.name}
                         options={{
+                            href: tab.name === "(feed)" ? null : undefined,
                             tabBarLabel: () => null, 
                             tabBarIcon: ({ focused }) => {
-                                // Si el icono tiene versión outline, la usamos cuando no está enfocado
                                 const iconName = focused ? tab.icon : `${tab.icon}-outline`;
                                 return (
                                     <View style={{ alignItems: "center", justifyContent: "center", width: 100 }}>

@@ -206,13 +206,12 @@ func (r *ClosetRepository) GetGarmentsByCategoryAndCloset(ctx context.Context, c
 
 // AddOutfitToCloset añade un outfit a un closet
 func (r *ClosetRepository) AddOutfitToCloset(ctx context.Context, closetID, outfitID uuid.UUID) error {
-	// Actualiza el campo outfit_ids que es un array de UUIDs
-	return r.db.WithContext(ctx).Exec(`
-        UPDATE closets 
-        SET outfit_ids = array_append(outfit_ids, ?), 
-            updated_at = ? 
-        WHERE id = ?`,
-		outfitID.String(), time.Now(), closetID).Error
+	closetOutfit := models.ClosetOutfit{
+		ClosetID: closetID,
+		OutfitID: outfitID,
+	}
+
+	return r.db.WithContext(ctx).Create(&closetOutfit).Error
 }
 
 // RemoveOutfitFromCloset elimina un outfit de un closet
@@ -228,23 +227,6 @@ func (r *ClosetRepository) RemoveOutfitFromCloset(ctx context.Context, closetID,
 
 // GetOutfitsByCloset obtiene todos los outfits asociados a un closet
 func (r *ClosetRepository) GetOutfitsByCloset(ctx context.Context, closetID uuid.UUID) ([]*models.Outfit, error) {
-	// Primero obtenemos el closet para acceder al array de outfit_ids
-	var closet models.Closet
-	if err := r.db.WithContext(ctx).Select("outfit_ids").First(&closet, "id = ?", closetID).Error; err != nil {
-		return nil, err
-	}
 
-	if len(closet.OutfitIDs) == 0 {
-		return []*models.Outfit{}, nil
-	}
-
-	// Luego obtenemos todos los outfits correspondientes
-	var outfits []*models.Outfit
-	if err := r.db.WithContext(ctx).
-		Where("id IN (?)", closet.OutfitIDs).
-		Find(&outfits).Error; err != nil {
-		return nil, err
-	}
-
-	return outfits, nil
+	return nil, nil
 }

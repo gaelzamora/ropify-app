@@ -57,14 +57,14 @@ export default function ClosetDetailScreen() {
 
     const fetchDeleteGarments = async (garments: string[]) => {
         try {
-            await garmentService.deleteMultipleGarmentsFromCloset(garments)
+            await garmentService.deleteMultipleGarmentsFromCloset(id.toString(), garments)
 
             setElementsSelected([])
             setIsDeleting(false)
 
             await fetchClothes(activeClosetOption.toLowerCase())
         } catch (error) {
-            Alert.alert("Error: ", String(error))
+            Alert.alert("Error", String(error))
         }
     }
 

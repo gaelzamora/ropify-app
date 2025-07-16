@@ -483,9 +483,16 @@ func (h *ClosetHandler) RemoveMultipleGarmentsFromCloset(ctx *fiber.Ctx) error {
 		err = h.closetRepository.RemoveGarmentFromCloset(context, closetID, garmentID)
 		if err != nil {
 			failedIDs[idStr] = err.Error()
-		} else {
-			successCount++
+			continue
 		}
+
+		err = h.garmentRepository.DeleteGarment(context, garmentID)
+		if err != nil {
+			failedIDs[idStr] = err.Error()
+			continue
+		}
+
+		successCount++
 	}
 
 	// Preparar respuesta
@@ -729,7 +736,7 @@ func (h *ClosetHandler) GetClosetOutfits(ctx *fiber.Ctx) error {
 		})
 	}
 
-	closetID, err := uuid.Parse(ctx.Params("id"))
+	closetID, err := uuid.Parse(ctx.Params("closetId"))
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
@@ -756,7 +763,6 @@ func (h *ClosetHandler) GetClosetOutfits(ctx *fiber.Ctx) error {
 		})
 	}
 
-	outfits, err := h.closetRepository.GetOutfitsByCloset(context, closetID)
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
@@ -764,9 +770,42 @@ func (h *ClosetHandler) GetClosetOutfits(ctx *fiber.Ctx) error {
 		})
 	}
 
+	type GarmentImage struct {
+		ID       uuid.UUID `json:"id"`
+		ImageURL string    `json:"image_url"`
+	}
+
+	type OutfitWithGarments struct {
+		models.Outfit
+		Garments []GarmentImage `json:"garments"`
+	}
+
+	var expandedOutfits []OutfitWithGarments
+
+	// for _, outfit := range outfits {
+	// 	var garments []GarmentImage
+	// 	for _, garmentID := range outfit. {
+	// 		id, err := uuid.Parse(garmentID)
+	// 		if err != nil {
+	// 			continue
+	// 		}
+	// 		garment, err := h.garmentRepository.GetGarmentByID(context, id)
+	// 		if err == nil {
+	// 			garments = append(garments, GarmentImage{
+	// 				ID:       garment.ID,
+	// 				ImageURL: garment.ImageURL,
+	// 			})
+	// 		}
+	// 	}
+	// 	expandedOutfits = append(expandedOutfits, OutfitWithGarments{
+	// 		Outfit:   *outfit,
+	// 		Garments: garments,
+	// 	})
+	// }
+
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"status": "success",
-		"data":   outfits,
+		"data":   expandedOutfits,
 	})
 }
 
@@ -1068,7 +1107,7 @@ func NewClosetHandler(
 	// Rutas para outfits en closets
 	router.Post("/:id/outfits/:outfit_id", handler.AddOutfitToCloset)
 	router.Delete("/:id/outfits/:outfit_id", handler.RemoveOutfitFromCloset)
-	router.Get("/:id/outfits", handler.GetClosetOutfits)
+	router.Get("/:closetId/outfits", handler.GetClosetOutfits)
 
 	// Ruta para generar outfit aleatorio desde un closet
 	router.Post("/:id/generate-outfit", handler.GenerateRandomOutfitFromCloset)

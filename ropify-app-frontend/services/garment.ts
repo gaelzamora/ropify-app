@@ -39,12 +39,13 @@ async function analyzeGarmentImage(
   });
 }
 
-
-
-async function deleteMultipleGarmentsFromCloset(garment_ids: string[]) {
-  return Api.delete('/garment/batch', { 
-    data: { garment_ids: garment_ids }
-   });
+async function deleteMultipleGarmentsFromCloset(
+  closet_id: string, 
+  garment_ids: string[]
+) {
+  return Api.post(`/closet/${closet_id}/garments/remove`, { 
+    garment_ids: garment_ids
+  });
 }
 
 export const garmentService = {

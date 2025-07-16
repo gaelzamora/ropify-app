@@ -354,11 +354,19 @@ func (s *OutfitGeneratorService) GenerateRandomOutfitFromCloset(ctx context.Cont
 		return nil, nil, fmt.Errorf("error retrieving closet info: %v", err)
 	}
 
+	var optimizedGarments []models.GarmentOptimized
+	for _, g := range baseGarments {
+		optimizedGarments = append(optimizedGarments, models.GarmentOptimized{
+			ID:       g.ID,
+			ImageURL: g.ImageURL,
+		})
+	}
+
 	outfit := &models.Outfit{
-		UserID:     closet.UserID,
-		Name:       outfitName,
-		GarmentIDs: garmentIDs,
-		CreatedAt:  time.Now(),
+		UserID:    closet.UserID,
+		Name:      outfitName,
+		Garments:  optimizedGarments,
+		CreatedAt: time.Now(),
 	}
 
 	return outfit, baseGarments, nil

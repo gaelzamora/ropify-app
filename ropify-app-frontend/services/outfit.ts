@@ -5,7 +5,7 @@ async function generateRandomOutfit(
     closetId: string,
     save?: boolean
 ): Promise<GeneratedOutfitResponse> {
-    return await Api.get(`/outfit/generate/${closetId}`, {
+    return await Api.post(`/closet/${closetId}/generate-outfit`, {
         params: { save }
     })
 

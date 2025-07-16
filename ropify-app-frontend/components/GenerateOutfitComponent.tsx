@@ -28,7 +28,7 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
     const handleSelectCloset = (closetId: string) => {
         setClosetSelected(closetId);
         setViewMode("outfit");
-        setOutfitRandom([]); // Limpia el outfit anterior si lo deseas
+        setOutfitRandom([]);
     };
 
     // Para volver a la vista de closets:
@@ -82,7 +82,7 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
                 <View style={styles.contentRandomOutfit}>
                     {viewMode === "closets" && (
                         <>
-                            <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20, color: "#222" }}>Select an outfit</Text>
+                            <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20, color: "#222" }}>Select a closet</Text>
                             <FlatList
                                 data={closets}
                                 keyExtractor={(item) => item.id.toString()}
@@ -91,7 +91,7 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
                                 contentContainerStyle={{
                                     alignContent: "center",
                                     justifyContent: "flex-start",
-                                    width: "100%",
+                                    width: "100%"
                                 }}
                                 ListEmptyComponent={
                                     isLoadingClosets ? (
@@ -132,7 +132,6 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
                                 contentContainerStyle={{
                                     alignContent: "center",
                                     justifyContent: "flex-start",
-                                    width: "100%",
                                     marginTop: 40
                                 }}
                                 ListEmptyComponent={
@@ -148,19 +147,32 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
                                     )
                                 }
                                 renderItem={({ item: garment }) => (
-                                    <TouchableOpacity style={styles.garmentContainer}>
+                                    <TouchableOpacity style={[styles.garmentContainer, {flexBasis: "30%", maxWidth: "30%"}]}>
                                         <SmartBackgroundRemoval imageUri={garment.image_url} boundingPoly={garment.boundingPoly} />
                                     </TouchableOpacity>
                                 )}
                             />
-                            {closetSelected && (
-                                <TouchableOpacity
-                                    style={styles.buttonGenerate}
-                                    onPress={() => fetchGenerateRandomOutfit(closetSelected, save)}
-                                >
-                                    <Text style={{ color: "white", fontSize: 18 }}>Generate Outfit</Text>
-                                </TouchableOpacity>
-                            )}
+
+                            <View
+                                style={{ position: "absolute", bottom: 40, alignSelf: "center" }}
+                            >
+                                {closetSelected && outfitRandom.length > 0 && (
+                                    <TouchableOpacity
+                                        style={[styles.button, {bottom: 5}]}
+                                        onPress={() => console.log("Guardado")}
+                                    >
+                                        <Text style={{ color: "white", fontSize: 18, textAlign: "center" }}>Save Outfit</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {closetSelected && (
+                                    <TouchableOpacity
+                                        style={styles.button}
+                                        onPress={() => fetchGenerateRandomOutfit(closetSelected, save)}
+                                    >
+                                        <Text style={{ color: "white", fontSize: 18 }}>Generate Outfit</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </>
                     )}
                 </View>
@@ -198,17 +210,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         position: "relative"
     },
-    buttonGenerate: {
+    button: {
         paddingHorizontal: 100,
         paddingVertical: 16,
         backgroundColor: "#222",
         borderRadius: 10,
-        position: "absolute",
-        bottom: 40,
-        alignSelf: "center"
     },
     garmentContainer: {
-        flex: 1,
         aspectRatio: 1,
         margin: 5,
         backgroundColor: 'transparent', 
@@ -216,7 +224,8 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         overflow: 'hidden',
         borderRadius: 15,
-        position: "relative"
+        position: "relative",
+        flex: 1
     },
     secundaryText: {
         fontSize: 14, 
