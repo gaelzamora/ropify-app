@@ -77,7 +77,7 @@ func (h *ClosetHandler) CreateCloset(ctx *fiber.Ctx) error {
 	defer src.Close()
 	imageBytes, err := io.ReadAll(src)
 	if err != nil {
-		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&fiber.Map{	
 			"status":  "fail",
 			"message": "Failed to read file",
 		})
@@ -101,8 +101,9 @@ func (h *ClosetHandler) CreateCloset(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"status": "success",
-		"data":   savedCloset,
+		"status":  "success",
+		"message": "Successfully created",
+		"data":    savedCloset,
 	})
 }
 
@@ -279,7 +280,7 @@ func (h *ClosetHandler) DeleteCloset(ctx *fiber.Ctx) error {
 	}
 
 	// Verificar que el closet exista y pertenezca al usuario
-	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	context, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	closet, err := h.closetRepository.GetClosetByID(context, closetID)
@@ -676,7 +677,7 @@ func (h *ClosetHandler) RemoveOutfitFromCloset(ctx *fiber.Ctx) error {
 		})
 	}
 
-	closetID, err := uuid.Parse(ctx.Params("id"))
+	closetID, err := uuid.Parse(ctx.Params("closetId"))
 	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
@@ -713,6 +714,13 @@ func (h *ClosetHandler) RemoveOutfitFromCloset(ctx *fiber.Ctx) error {
 
 	// Eliminar el outfit del closet
 	if err := h.closetRepository.RemoveOutfitFromCloset(context, closetID, outfitID); err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": err.Error(),
+		})
+	}
+
+	if err := h.outfitRepository.DeleteOutfit(context, outfitID); err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
 			"message": err.Error(),
@@ -770,42 +778,79 @@ func (h *ClosetHandler) GetClosetOutfits(ctx *fiber.Ctx) error {
 		})
 	}
 
-	type GarmentImage struct {
-		ID       uuid.UUID `json:"id"`
-		ImageURL string    `json:"image_url"`
+	outfits, err := h.closetRepository.GetOutfitsByCloset(context, closetID)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": err.Error(),
+		})
 	}
-
-	type OutfitWithGarments struct {
-		models.Outfit
-		Garments []GarmentImage `json:"garments"`
-	}
-
-	var expandedOutfits []OutfitWithGarments
-
-	// for _, outfit := range outfits {
-	// 	var garments []GarmentImage
-	// 	for _, garmentID := range outfit. {
-	// 		id, err := uuid.Parse(garmentID)
-	// 		if err != nil {
-	// 			continue
-	// 		}
-	// 		garment, err := h.garmentRepository.GetGarmentByID(context, id)
-	// 		if err == nil {
-	// 			garments = append(garments, GarmentImage{
-	// 				ID:       garment.ID,
-	// 				ImageURL: garment.ImageURL,
-	// 			})
-	// 		}
-	// 	}
-	// 	expandedOutfits = append(expandedOutfits, OutfitWithGarments{
-	// 		Outfit:   *outfit,
-	// 		Garments: garments,
-	// 	})
-	// }
 
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"status": "success",
-		"data":   expandedOutfits,
+		"data": fiber.Map{
+			"closet_name": closet.Name,
+			"outfits":     outfits,
+		},
+	})
+}
+
+// Editar outfit
+func (h *ClosetHandler) UpdateOutfitFromCloset(ctx *fiber.Ctx) error {
+	clId := ctx.Params("closetId")
+	closetId, err := uuid.Parse(clId)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid closet ID",
+		})
+	}
+
+	outId := ctx.Params("outfit_id")
+	outfitId, err := uuid.Parse(outId)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid outfit ID",
+		})
+	}
+
+	var updateData map[string]interface{}
+	if err := ctx.BodyParser(&updateData); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": err.Error(),
+		})
+	}
+
+	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	belongs, err := h.closetRepository.OutfitBelongsToCloset(context, closetId, outfitId)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Errorr checking outfit-closet relation",
+		})
+	}
+	if !belongs {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Outfit does not belong to this closet",
+		})
+	}
+
+	updatedOutfit, err := h.outfitRepository.UpdateOutfit(context, outfitId, updateData)
+	if err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "fail",
+			"message": err.Error(),
+		})
+	}
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status": "success",
+		"data":   updatedOutfit,
 	})
 }
 
@@ -1106,8 +1151,9 @@ func NewClosetHandler(
 
 	// Rutas para outfits en closets
 	router.Post("/:id/outfits/:outfit_id", handler.AddOutfitToCloset)
-	router.Delete("/:id/outfits/:outfit_id", handler.RemoveOutfitFromCloset)
 	router.Get("/:closetId/outfits", handler.GetClosetOutfits)
+	router.Delete("/:closetId/outfits/:outfit_id", handler.RemoveOutfitFromCloset)
+	router.Patch("/:closetId/outfits/:outfit_id", handler.UpdateOutfitFromCloset)
 
 	// Ruta para generar outfit aleatorio desde un closet
 	router.Post("/:id/generate-outfit", handler.GenerateRandomOutfitFromCloset)

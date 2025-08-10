@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -23,26 +22,89 @@ type OutfitHandler struct {
 
 // Crear outfit
 func (h *OutfitHandler) CreateOutfit(ctx *fiber.Ctx) error {
-	var outfit models.Outfit
-	if err := ctx.BodyParser(&outfit); err != nil {
+	userIDStr := ctx.Locals("userId").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
-			"message": err.Error(),
+			"message": "Invalid user ID",
 		})
 	}
+
+	var payload struct {
+		ClosetID string                       `json:"closet_id"`
+		Name     string                       `json:"name"`
+		Garments models.GarmentOptimizedArray `json:"garments"`
+	}
+
+	if err := ctx.BodyParser(&payload); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid request data",
+		})
+	}
+
+	closetID, err := uuid.Parse(payload.ClosetID)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid closet ID",
+		})
+	}
+
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	newOutfit, err := h.repository.AddOutfit(context, &outfit)
+	closet, err := h.closetRepository.GetClosetByID(context, closetID)
+	if err != nil {
+		return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Closet not found",
+		})
+	}
+
+	if closet.UserID != userID {
+		return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "You don't have access to this closet",
+		})
+	}
+
+	if payload.Name == "" {
+		payload.Name = "Generate Outfit"
+	}
+
+	outfit := models.Outfit{
+		ID:        uuid.New(),
+		Name:      payload.Name,
+		UserID:    userID,
+		CreatedAt: time.Now(),
+	}
+
+	savedOutfit, err := h.repository.CreateOutfitWithGarments(context, &outfit, payload.Garments)
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":  "fail",
-			"message": err.Error(),
+			"message": "Error creating outfit: " + err.Error(),
 		})
 	}
+
+	if err := h.closetRepository.AddOutfitToCloset(context, closetID, savedOutfit.ID); err != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "partial_success",
+			"message": "Outfit created but not added to closet. Try again later",
+			"data": fiber.Map{
+				"outfit": savedOutfit,
+			},
+		})
+	}
+
 	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"status": "success",
-		"data":   newOutfit,
+		"status":  "success",
+		"message": "Outfit created successfully",
+		"data": fiber.Map{
+			"outfit": savedOutfit,
+		},
 	})
 }
 
@@ -235,8 +297,6 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Println("Closet ID: ", closetID)
-
 	// Verificar que el closet existe y pertenece al usuario
 	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -316,7 +376,7 @@ func (h *OutfitHandler) GenerateRandomOutfit(ctx *fiber.Ctx) error {
 			"garments": garments,
 		},
 	})
-}
+} 
 
 func NewOutfitHandler(router fiber.Router, repository models.OutfitRepository, garmentRepository models.GarmentRepository, closetRepository models.ClosetRepository) {
 	outfitGenerator := services.NewOutfitGeneratorService(garmentRepository, closetRepository)

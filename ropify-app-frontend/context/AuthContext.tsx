@@ -4,11 +4,12 @@ import React, { useEffect, useState } from "react";
 import { User } from "@/types/user";
 import { router } from "expo-router";
 import { oauthService } from "@/services/oauth";
+import Toast from "react-native-toast-message";
 
 interface AuthContextProps {
     isLoggedIn: boolean;
     isLoadingAuth: boolean;
-    authenticate: (authMode: "login" | "register", email: string, password: string, username?: string, firstName?: string, lastName?: string) => Promise<void>
+    authenticate: (authMode: "login" | "register", email: string, password: string, username?: string, firstName?: string, lastName?: string) => Promise<any>
     logout: VoidFunction;
     user: User | null;
     authenticateWithGoogle: (accessToken: string | undefined) => Promise<void>;
@@ -67,6 +68,7 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
                 }
             }
 
+            
             let response;
             if (authMode === "login") {
                 response = await userService[authMode](email, password);
@@ -75,16 +77,30 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
             }
 
             if (response) {
-                    setIsLoggedIn(true)
-                    await AsyncStorage.setItem("token", response.data.token)
-                    await AsyncStorage.setItem("user", JSON.stringify(response.data.user))
-                    setUser(response.data.user)
-                    router.replace("/(authed)/(tabs)/(closet)" as any)
-                
+                setIsLoggedIn(true)
+                await AsyncStorage.setItem("token", response.data.token)
+                await AsyncStorage.setItem("user", JSON.stringify(response.data.user))
+                setUser(response.data.user)
+                router.replace("/(authed)/(tabs)/(closet)" as any)
+
+                Toast.show({
+                    type: "success",
+                    text1: "Welcome!",
+                    text2: response.message 
+                })
             }
+
         } catch (error) {
-            console.log(error)
             setIsLoggedIn(false)
+
+            const err = error as any
+
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: err?.response?.data.message || "Oops, something went wrong, Please try again later."
+            })
+
         } finally {
             setIsLoadingAuth(false)
         }
@@ -102,7 +118,6 @@ export function AuthenticationProvider({ children }: React.PropsWithChildren) {
                     await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
                     setUser(response.data.user);
                     router.replace("/(authed)/(tabs)/(closet)" as any);
-                    console.log("New user: ", user)
                 } else {
                     console.log("No hay response")
                 }

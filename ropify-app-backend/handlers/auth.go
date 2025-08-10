@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
@@ -13,7 +13,8 @@ import (
 var validate = validator.New()
 
 type AuthHandler struct {
-	service models.AuthService
+	authRepository models.AuthRepository
+	service        models.AuthService
 }
 
 func (h *AuthHandler) Login(ctx *fiber.Ctx) error {
@@ -64,17 +65,52 @@ func (h *AuthHandler) Register(ctx *fiber.Ctx) error {
 	if err := ctx.BodyParser(&creds); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(&fiber.Map{
 			"status":  "fail",
-			"message": err.Error(),
+			"message": "Invalid request format",
 		})
 	}
 
-	if err := validate.Struct(creds); err != nil {
-		return ctx.Status(fiber.StatusBadRequest).JSON(&fiber.Map{
+	missing := []string{}
+
+	if creds.Email == "" {
+		missing = append(missing, "email")
+	}
+	if creds.Username == "" {
+		missing = append(missing, "username")
+	}
+	if creds.Password == "" {
+		missing = append(missing, "password")
+	}
+
+	if len(missing) > 0 {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "fail",
-			"message": fmt.Errorf("please, provide a valid name, email and password").Error(),
+			"message": "Missing required fields: " + strings.Join(missing, ", "),
 		})
 	}
 
+	// Validar formato de email
+	if !models.IsValidEmail(creds.Email) {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Invalid email format",
+		})
+	}
+
+	// Verificar unicidad de email
+	if _, err := h.authRepository.GetUser(ctx.Context(), "email = ?", creds.Email); err == nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Email is already in use",
+		})
+	}
+
+	// Verificar unicidad de username
+	if _, err := h.authRepository.GetUser(ctx.Context(), "username = ?", creds.Username); err == nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "Username is already in use",
+		})
+	}
 	token, user, err := h.service.Register(context, creds)
 
 	if err != nil {
@@ -94,9 +130,10 @@ func (h *AuthHandler) Register(ctx *fiber.Ctx) error {
 	})
 }
 
-func NewAuthHandler(route fiber.Router, service models.AuthService) {
+func NewAuthHandler(route fiber.Router, service models.AuthService, authRepository models.AuthRepository) {
 	handler := &AuthHandler{
-		service: service,
+		authRepository: authRepository,
+		service:        service,
 	}
 
 	route.Post("/login", handler.Login)

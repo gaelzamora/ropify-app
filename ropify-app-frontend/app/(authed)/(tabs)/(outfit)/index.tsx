@@ -1,8 +1,13 @@
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import GenerateOutfitComponent from "@/components/GenerateOutfitComponent";
 import { Ionicons } from "@expo/vector-icons";
-
+import { Closet } from "@/types/closet";
+import { closetService } from "@/services/closet";
+import { useFocusEffect } from "expo-router";
+import { Outfit } from "@/types/outfit";
+import { outfitService } from "@/services/outfit";
+import Toast from "react-native-toast-message";
 
 const tabs = [
     "My Outfits",
@@ -12,10 +17,60 @@ const tabs = [
 export default function OutfitScreen() {
     const [activeOptionSelected, setActiveOptionSelected] = useState(tabs[0])
     const [isModalOutfitGeneratedActive, setIsModalOutfitGeneratedActive] = useState(false)
-    const [outfits, setOutfits] = useState<any>(null)
+    
+    const [outfits, setOutfits] = useState<Outfit[]>([])
+    const [closets, setClosets] = useState<Closet[]>([])
+    const [activeClosetOption, setActiveClosetOption] = useState(closets[0]?.name)
+    const [activeClosetID, setActiveClosetID] = useState(closets[0]?.id)
+    
     const [searchQuery, setSearchQuery] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-    
+
+    const fetchClosets = async () => {
+        try {
+            setIsLoading(true)
+            const response = await closetService.getMany()
+            setClosets(response.data)
+
+            if (response.data && response.data.length > 0) {
+                setActiveClosetOption(response.data[0].name)
+                setActiveClosetOption(response.data[0].id)
+            }
+        } catch (error) {
+            Alert.alert("Error: ", String(error))
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const fetchOutfits = async () => {
+        if (!activeClosetID) return
+
+        try {
+            setIsLoading(true)
+            const response = await outfitService.getOutfits(activeClosetID)
+            setOutfits(response.data.data.outfits)
+        } catch(err: any) {
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: err.response.data.message || "Oops, something went wrong, Please try again later"
+            })
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useFocusEffect(useCallback(() => { 
+        fetchClosets()
+    }, []))
+
+    useEffect(() => {
+        if (activeClosetID) {
+            fetchOutfits()
+        }
+    }, [activeClosetID])
+
     return (
         <>
             <View style={styles.outfitContainer}>
@@ -47,6 +102,37 @@ export default function OutfitScreen() {
                         </View>
                     </View>
                     
+                    <View style={{ height: 40 }}>
+                        <FlatList 
+                            data={closets}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            keyExtractor={(item: Closet) => item.id}
+                            contentContainerStyle={{
+                                gap: 10
+                            }}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setActiveClosetOption(item.name)
+                                        setActiveClosetID(item.id)
+                                    }} 
+                                    style={[styles.closetContainer, activeClosetOption === item.name && styles.closetActive]}
+                                >
+                                    <Text
+                                        style={{
+                                            color: activeClosetOption === item.name ? "white" : "#222",
+                                            textAlign: "center"
+                                        }}
+                                    >
+                                        {item.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </View>
+
+                    
                     <View style={styles.searchContainer}>
                         <Ionicons 
                             name="search-outline" 
@@ -67,7 +153,7 @@ export default function OutfitScreen() {
                     <View style={styles.outfitSection}>
                         <FlatList
                             data={outfits}
-                            keyExtractor={(item) => item}
+                            keyExtractor={(item) => item.id}
                             numColumns={2}
                             contentContainerStyle={{
                                 flex: 1,
@@ -77,14 +163,16 @@ export default function OutfitScreen() {
                             ListEmptyComponent={
                                 isLoading ? (
                                     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 40 }}>
-                                        <ActivityIndicator size="large" color="#ee1e1e" />
+                                        <ActivityIndicator size="large" color="#wee1e1e" />
                                     </View>
                                 ) : (
                                     <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 40 }}>
                                         <Ionicons name="shirt" size={48} color="#7a7676" style={{ marginBottom: 10 }} />
-                                        <Text style={{ fontSize: 20, color: "#7a7676", fontWeight: "700", textAlign: "center" }}>No clothes saved.</Text>
+                                        <Text style={{ fontSize: 20, color: "#7a7676", fontWeight: "700", textAlign: "center" }}>
+                                            No outfits created.
+                                        </Text>
                                         <Text style={{ fontSize: 12, color: "#7a7676", textAlign: "center" }}>
-                                            You haven&apos;t saved any clothes yet, so we don&apos;t have anything to show you! Go save some!.
+                                            You haven&apos;t created any outfits yet. Start by generating or creating a new outfit!
                                         </Text>
                                     </View>
                                 )
@@ -153,9 +241,20 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
+    closetContainer: {
+        paddingHorizontal: 15,
+        paddingVertical: 6,
+        borderRadius: 20,
+        alignItems: "center",
+        justifyContent: "center"
+    },
     itemActive: {
         borderColor: "#353333",
         borderBottomWidth: 3
+    },
+    closetActive: {
+        backgroundColor: "#353333",
+        borderRadius: 20,
     },
     searchContainer: {
         flexDirection: 'row',

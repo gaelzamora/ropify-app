@@ -44,7 +44,7 @@ func main() {
 	server := app.Group("/api")
 
 	// Auth handler's
-	handlers.NewAuthHandler(server.Group("/auth"), authService)
+	handlers.NewAuthHandler(server.Group("/auth"), authService, authRepository)
 	handlers.NewOAuthHandler(server.Group("/oauth"), oauthService)
 
 	// Private route to verify if user is authenticatedw

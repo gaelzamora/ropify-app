@@ -8,6 +8,7 @@ import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Modal from "react-native-modal"
 import * as ImagePicker from "expo-image-picker"
+import Toast from "react-native-toast-message";
 
 export default function ClosetScreen() {
     // Closets
@@ -60,6 +61,29 @@ export default function ClosetScreen() {
         }
     }
 
+    const deleteCloset = async (id: string) => {
+        try {
+            const response = await closetService.deleteOne(id);
+
+            Toast.show({
+                type: "success",
+                text1: "Closet deleted",
+                text2: response.statusText || "Closet deleted"
+            })
+
+            fetchClosets()
+        } catch (error) {
+            const err = error as any
+
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: err.response.data.message || "Oops, something went wrong, Please try again later"
+            })
+        }
+
+    }
+
     const pickImage = async () => {
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -70,7 +94,7 @@ export default function ClosetScreen() {
             const asset = result.assets[0];
             setClosetImage({
                 uri: asset.uri,
-                name: asset.fileName || "closet_image.jpg",
+                name: asset.fileName || "image.jpg",
                 type: asset.type || "image/jpeg"
             });
         }
@@ -84,13 +108,24 @@ export default function ClosetScreen() {
         }
         setIsSubmitting(true);
         try {
-            await closetService.createOne(closetName, closetImage);
+            const response = await closetService.createOne(closetName, closetImage);
             setIsOpenAdd(false);
             setClosetName("");
             setClosetImage(null);
+
+            Toast.show({
+                type: "success",
+                text1: "Success",
+                text2: response.message || "Closet created"
+            })
+
             fetchClosets();
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Could not create closet.");
+            Toast.show({
+                type: "error",
+                text1: "Error",
+                text2: err.response.data.message || "Oops, something went wrong, Please try again later"
+            })
         } finally {
             setIsSubmitting(false);
         }
@@ -110,11 +145,11 @@ export default function ClosetScreen() {
                 {user?.firstName && user.lastName ? (
                     <Text
                         style={{ fontSize: 14, color: "#888", fontWeight: "400" }}
-                    >Hello: {user?.firstName + ' ' + user?.lastName}</Text>
+                    >Hi: {user?.firstName + ' ' + user?.lastName}</Text>
                 ) : (
                     <Text
                         style={{ fontSize: 14, color: "#888", fontWeight: "400" }}
-                    >Hello: {user?.email}</Text>
+                    >Hi: {user?.email}</Text>
                 )}
                 <Text style={styles.textMain}>Closet&apos;s</Text>
             </View>
@@ -177,7 +212,7 @@ export default function ClosetScreen() {
                                         <TouchableOpacity
                                             style={styles.trashButton}
                                             onPress={async () => {
-                                                await closetService.deleteOne(closet.id);
+                                                deleteCloset(closet.id);
                                                 setIsDeleteMode(false);
                                                 setClosetToDelete(null);
                                                 fetchClosets();

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
-	"github.com/gaelzamora/ropify-app/services"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -68,60 +67,73 @@ func (r *ClosetRepository) UpdateCloset(ctx context.Context, id uuid.UUID, updat
 
 // DeleteCloset elimina un closet
 func (r *ClosetRepository) DeleteCloset(ctx context.Context, id uuid.UUID) error {
-	// Usar una transacción para eliminar el closet y sus relaciones
-	tx := r.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
+    tx := r.db.WithContext(ctx).Begin()
+    if tx.Error != nil {
+        return tx.Error
+    }
 
-	// Primero, obtener todas las prendas asociadas a este closet
-	var garmentIDs []uuid.UUID
-	if err := tx.Table("closet_garments").
-		Where("closet_id = ?", id).
-		Pluck("garment_id", &garmentIDs).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
+    // 1. Obtener garmentIDs que solo pertenecen a este closet
+    var garmentIDs []uuid.UUID
+    if err := tx.Raw(`
+        SELECT garment_id FROM closet_garments
+        WHERE closet_id = ?
+        AND garment_id NOT IN (
+            SELECT garment_id FROM closet_garments WHERE closet_id <> ?
+        )
+    `, id, id).Scan(&garmentIDs).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
 
-	// Eliminar las relaciones con garments
-	if err := tx.Where("closet_id = ?", id).Delete(&models.ClosetGarment{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
+    // 2. Obtener outfitIDs que solo pertenecen a este closet
+    var outfitIDs []uuid.UUID
+    if err := tx.Raw(`
+        SELECT outfit_id FROM closet_outfits
+        WHERE closet_id = ?
+        AND outfit_id NOT IN (
+            SELECT outfit_id FROM closet_outfits WHERE closet_id <> ?
+        )
+    `, id, id).Scan(&outfitIDs).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
 
-	// Para cada prenda, verificar si pertenece a otro closet antes de eliminarla
-	for _, garmentID := range garmentIDs {
-		var count int64
-		if err := tx.Model(&models.ClosetGarment{}).
-			Where("garment_id = ?", garmentID).
-			Count(&count).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
+    // 3. Eliminar relaciones con garments
+    if err := tx.Where("closet_id = ?", id).Delete(&models.ClosetGarment{}).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
 
-		// Si la prenda no pertenece a ningún otro closet, eliminarla
-		if count == 0 {
-			var garment models.Garment
-			if err := tx.First(&garment, "id = ?", garmentID).Error; err != nil {
-				tx.Rollback()
-				return err
-			}
-			services.DeleteFromS3(garment.ImageURL)
 
-			if err := tx.Delete(&models.Garment{}, "id = ?", garmentID).Error; err != nil {
-				tx.Rollback()
-				return err
-			}
-		}
-	}
+    // 4. Eliminar relaciones con outfits
+    if err := tx.Where("closet_id = ?", id).Delete(&models.ClosetOutfit{}).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
 
-	// Eliminar el closet
-	if err := tx.Delete(&models.Closet{}, "id = ?", id).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
+    // 5. Eliminar garments en lote
+    if len(garmentIDs) > 0 {
+        if err := tx.Where("id IN ?", garmentIDs).Delete(&models.Garment{}).Error; err != nil {
+            tx.Rollback()
+            return err
+        }
+    }
 
-	return tx.Commit().Error
+    // 6. Eliminar outfits en lote
+    if len(outfitIDs) > 0 {
+        if err := tx.Where("id IN ?", outfitIDs).Delete(&models.Outfit{}).Error; err != nil {
+            tx.Rollback()
+            return err
+        }
+    }
+
+    // 7. Eliminar el closet
+    if err := tx.Delete(&models.Closet{}, "id = ?", id).Error; err != nil {
+        tx.Rollback()
+        return err
+    }
+
+    return tx.Commit().Error
 }
 
 // AddGarmentToCloset añade una prenda a un closet
@@ -216,17 +228,34 @@ func (r *ClosetRepository) AddOutfitToCloset(ctx context.Context, closetID, outf
 
 // RemoveOutfitFromCloset elimina un outfit de un closet
 func (r *ClosetRepository) RemoveOutfitFromCloset(ctx context.Context, closetID, outfitID uuid.UUID) error {
-	// Elimina un UUID específico del array outfit_ids
-	return r.db.WithContext(ctx).Exec(`
-        UPDATE closets 
-        SET outfit_ids = array_remove(outfit_ids, ?),
-            updated_at = ?
-        WHERE id = ?`,
-		outfitID.String(), time.Now(), closetID).Error
+	return r.db.WithContext(ctx).
+		Where("closet_id = ? AND outfit_id = ?", closetID, outfitID).
+		Delete(&models.ClosetOutfit{}).Error
+}
+
+func (r *ClosetRepository) OutfitBelongsToCloset(ctx context.Context, closetID, outfitID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("closet_outfits").
+		Where("closet_id = ? AND outfit_id = ?", closetID, outfitID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 // GetOutfitsByCloset obtiene todos los outfits asociados a un closet
 func (r *ClosetRepository) GetOutfitsByCloset(ctx context.Context, closetID uuid.UUID) ([]*models.Outfit, error) {
+	var outfits []*models.Outfit
 
-	return nil, nil
+	query := r.db.WithContext(ctx).
+		Table("outfits").
+		Joins("JOIN closet_outfits ON outfits.id = closet_outfits.outfit_id").
+		Where("closet_outfits.closet_id = ?", closetID)
+
+	err := query.Find(&outfits).Error
+
+	return outfits, err
 }

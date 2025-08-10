@@ -1,6 +1,6 @@
 import { ApiResponse } from "./api";
 
-export type ClosetResponse = ApiResponse<{ message: string, data: Closet }>
+export type ClosetResponse = ApiResponse<{ data: Closet }>
 export type ClosetListResponse = ApiResponse<Closet[]>
 
 export type Closet = {

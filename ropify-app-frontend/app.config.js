@@ -1,4 +1,14 @@
 export default {
+  plugins: [
+    [
+      "expo-build-properties",
+      {
+        ios: {
+          deploymentTarget: "13.0"
+        }
+      }
+    ]
+  ],
   expo: {
     name: "ropify-app-frontend",
     slug: "ropify-app-frontend",

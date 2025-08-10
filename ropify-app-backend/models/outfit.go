@@ -36,7 +36,7 @@ type Outfit struct {
 	ID        uuid.UUID             `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
 	UserID    uuid.UUID             `json:"user_id" gorm:"type:uuid;not null"`
 	Name      string                `json:"name" gorm:"not null"`
-	Garments  GarmentOptimizedArray `json:"garment_ids" gorm:"type:jsonb"`
+	Garments  GarmentOptimizedArray `json:"garments" gorm:"type:jsonb"`
 	Occasion  string                `json:"occasion"`
 	Archived  bool                  `json:"archived" gorm:"default:false"`
 	ImageURL  string                `json:"image_url"`
@@ -50,6 +50,13 @@ type OutfitRepository interface {
 	ArchiveOutfit(ctx context.Context, outfitID uuid.UUID) error
 	GetOutfitByID(ctx context.Context, outfitID uuid.UUID) (*Outfit, error)
 	GetOutfitsByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Outfit, error)
+	CreateOutfitWithGarments(ctx context.Context, outfit *Outfit, garments GarmentOptimizedArray) (*Outfit, error)
+}
+
+type OutfitGarment struct {
+	OutfitID  uuid.UUID `gorm:"primaryKey;type:uuid"`
+	GarmentID uuid.UUID `gorm:"primaryKey;type:uuid"`
+	CreatedAt time.Time
 }
 
 func (o *Outfit) BeforeCreate(tx *gorm.DB) (err error) {

@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"time"
 
 	"github.com/gaelzamora/ropify-app/models"
 	"github.com/google/uuid"
@@ -63,6 +64,45 @@ func (r *OutfitRepository) GetOutfitsByUser(ctx context.Context, userID uuid.UUI
 		return nil, res.Error
 	}
 	return outfits, nil
+}
+
+func (r *OutfitRepository) CreateOutfitWithGarments(ctx context.Context, outfit *models.Outfit, garments models.GarmentOptimizedArray) (*models.Outfit, error) {
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+
+	if err := tx.Create(outfit).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if len(garments) > 0 {
+		for _, garment := range garments {
+			outfitGarment := models.OutfitGarment{
+				OutfitID:  outfit.ID,
+				GarmentID: garment.ID,
+				CreatedAt: time.Now(),
+			}
+
+			if err := tx.Create(&outfitGarment).Error; err != nil {
+				tx.Rollback()
+				return nil, err
+			}
+		}
+
+		outfit.Garments = garments
+		if err := tx.Model(outfit).Update("garments", outfit.Garments).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+
+	return outfit, nil
 }
 
 func NewOutfitRepository(db *gorm.DB) models.OutfitRepository {

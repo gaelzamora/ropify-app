@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Image, ScrollView } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Image, ScrollView, Button } from "react-native";
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/context/AuthContext";
 import * as Google from 'expo-auth-session/providers/google'
 import Constants from 'expo-constants'
+import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -14,7 +15,7 @@ const iosClientId = Constants.expoConfig?.extra?.CLIENT_IOS_ID;
 const androidClientId = Constants.expoConfig?.extra?.CLIENT_ANDROID_ID;
 
 const Login: React.FC = () => {
-    const { authenticate, isLoadingAuth, authenticateWithGoogle } = useAuth();
+    const { authenticate, isLoadingAuth, authenticateWithGoogle, isLoggedIn } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const router = useRouter();
@@ -96,6 +97,7 @@ const Login: React.FC = () => {
                             <Text style={styles.buttonText}>Login</Text>
                         )}
                     </TouchableOpacity>
+
                     <TouchableOpacity 
                         onPress={() => router.push('/register')}
                         style={styles.loginLink}
@@ -104,7 +106,7 @@ const Login: React.FC = () => {
                     </TouchableOpacity>
                 </View>
                 
-                <Text style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 20 }}>Or sign in with</Text>
+                {/* <Text style={{ fontSize: 12, color: "#888", textAlign: "center", marginTop: 20 }}>Or sign in with</Text>
                 
                 <View style={styles.socialContainer}>
                     
@@ -124,7 +126,7 @@ const Login: React.FC = () => {
                     <TouchableOpacity style={styles.socialButton}>
                         <FontAwesome name="twitter" size={28} color="#1DA1F2" />
                     </TouchableOpacity>
-                </View>
+                </View> */}
             </ScrollView>
         </KeyboardAvoidingView>
     );

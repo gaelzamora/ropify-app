@@ -13,3 +13,8 @@ export type Garment = {
     is_verified: string
     boundingPoly?: {x: number, y:number}[]
 }
+
+export type GarmentOptimized = {
+    id: string
+    image_url: string
+}

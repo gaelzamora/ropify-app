@@ -47,6 +47,7 @@ type ClosetRepository interface {
 	AddOutfitToCloset(ctx context.Context, closetID, outfitID uuid.UUID) error
 	RemoveOutfitFromCloset(ctx context.Context, closetID, outfitID uuid.UUID) error
 	GetOutfitsByCloset(ctx context.Context, closetID uuid.UUID) ([]*Outfit, error)
+	OutfitBelongsToCloset(ctx context.Context, closetID, outfitID uuid.UUID) (bool, error)
 
 	GetGarmentsByCategoryAndCloset(ctx context.Context, closetID uuid.UUID, category string, limit int) ([]*Garment, error)
 }

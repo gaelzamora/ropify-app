@@ -1,28 +1,93 @@
-import React, { useCallback, useState } from "react"
-import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Text } from "react-native"
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Text, Animated } from "react-native"
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import Modal from 'react-native-modal'
 import { outfitService } from "@/services/outfit";
 import SmartBackgroundRemoval from "@/components/SmartBackgroundRemoval";
-import { Garment } from "@/types/garment";
+import { Garment, GarmentOptimized } from "@/types/garment";
 import { Closet } from "@/types/closet";
 import { closetService } from "@/services/closet";
 import { useFocusEffect } from "expo-router";
+import Toast from "react-native-toast-message";
 
 type ComponentProps = {
     isModalOutfitGeneratedActive: boolean
     setIsModalOutfitGeneratedActive: (state: boolean) => void
 }
 
+type props = {
+    visible: boolean
+    message: string
+    type: "success" | any
+}
+
+export const InModalToast = ({ visible, message, type = "success" }: props) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        if (visible) {
+        setMounted(true);
+        Animated.timing(opacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+        } else {
+        Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+        }).start(() => setMounted(false));
+        }
+    }, [visible]);
+
+    if (!mounted) return null;
+
+    return (
+        <Animated.View style={{
+        position: "absolute",
+        top: 20,
+        left: 20,
+        right: 20,
+        backgroundColor: type === "success" ? "#4CAF50" : "#F44336",
+        padding: 10,
+        borderRadius: 8,
+        zIndex: 9999,
+        flexDirection: "row",
+        alignItems: "center",
+        opacity,
+        }}>
+        <Ionicons
+            name={type === "success" ? "checkmark-circle" : "alert-circle"}
+            size={24}
+            color="white"
+            style={{ marginRight: 8 }}
+        />
+        <Text style={{ color: "white", fontWeight: "500" }}>{message}</Text>
+        </Animated.View>
+    );
+};
+
 export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, setIsModalOutfitGeneratedActive }: ComponentProps) {
-    const [save, setSave] = useState(false)
     const [isLoadingRandomOutfit, setIsLoadingRandomOutfit] = useState(false)
-    const [outfitRandom, setOutfitRandom] = useState<Garment[]>([])
-    const [closetSelected, setClosetSelected] = useState<string | null>(null)
+    const [outfitRandom, setOutfitRandom] = useState<GarmentOptimized[]>([])
+    const [closetSelected, setClosetSelected] = useState<string | undefined>(undefined)
     const [closets, setClosets] = useState<Closet[]>([])
     const [isLoadingClosets, setIsLoadingClosets] = useState(false)
-
     const [viewMode, setViewMode] = useState<"closets" | "outfit">("closets");
+    const [isLoadingButton, setIsLoadingButton] = useState(false)
+
+    const [inModalToast, setInModalToast] = useState({
+        visible: false,
+        message: "",
+        type: "success"
+    })
+
+    const showInModalToast = (message: string, type = "success") => {
+        setInModalToast({ visible: true, message, type })
+        setTimeout(() => setInModalToast({ visible: false, message: "", type }), 3000)
+    }
 
     // Cuando seleccionas un closet:
     const handleSelectCloset = (closetId: string) => {
@@ -34,7 +99,7 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
     // Para volver a la vista de closets:
     const handleBackToClosets = () => {
         setViewMode("closets");
-        setClosetSelected(null);
+        setClosetSelected(undefined);
         setOutfitRandom([]);
     };
 
@@ -42,7 +107,8 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
         try {
             setIsLoadingRandomOutfit(true)
             const response = await outfitService.generateRandomOutfit(closet_id, save)
-            setOutfitRandom(response.data.garments)
+            setOutfitRandom(response.data.outfit.garments)
+
         } catch (error) {
             Alert.alert("Error: ", String(error))
         } finally {
@@ -62,6 +128,18 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
             }
     }
 
+    const handleSaveOutfit = async () => {
+        setIsLoadingButton(true)
+        try {
+            const response = await outfitService.createOutfit(outfitRandom, closetSelected, "")
+            showInModalToast(response.message || "Outfit saved successfully")
+        } catch (err: any) {
+            showInModalToast(err.response?.data?.message || "Something went wrong", "error")
+        } finally {
+            setIsLoadingButton(false)
+        }
+    }
+
     useFocusEffect(useCallback(() => { fetchClosets() }, []))
 
     return (
@@ -78,6 +156,11 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
             style={styles.modal}
         >
             <View style={styles.modalContent}>
+                <InModalToast 
+                    visible={inModalToast.visible}
+                    message={inModalToast.message}
+                    type={inModalToast.type}
+                />
                 <View style={styles.dragIndicator} />
                 <View style={styles.contentRandomOutfit}>
                     {viewMode === "closets" && (
@@ -148,7 +231,7 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
                                 }
                                 renderItem={({ item: garment }) => (
                                     <TouchableOpacity style={[styles.garmentContainer, {flexBasis: "30%", maxWidth: "30%"}]}>
-                                        <SmartBackgroundRemoval imageUri={garment.image_url} boundingPoly={garment.boundingPoly} />
+                                        <SmartBackgroundRemoval imageUri={garment.image_url} />
                                     </TouchableOpacity>
                                 )}
                             />
@@ -158,16 +241,20 @@ export default function GenerateOutfitComponent({ isModalOutfitGeneratedActive, 
                             >
                                 {closetSelected && outfitRandom.length > 0 && (
                                     <TouchableOpacity
-                                        style={[styles.button, {bottom: 5}]}
-                                        onPress={() => console.log("Guardado")}
+                                        style={[styles.button, {bottom: 10}]}
+                                        onPress={handleSaveOutfit}
                                     >
-                                        <Text style={{ color: "white", fontSize: 18, textAlign: "center" }}>Save Outfit</Text>
+                                        {isLoadingButton ? (
+                                            <ActivityIndicator color="#fff" size="small" />
+                                        ) : (
+                                            <Text style={{ color: "white", fontSize: 18, textAlign: "center" }}>Save Outfit</Text>
+                                        )}
                                     </TouchableOpacity>
                                 )}
                                 {closetSelected && (
                                     <TouchableOpacity
                                         style={styles.button}
-                                        onPress={() => fetchGenerateRandomOutfit(closetSelected, save)}
+                                        onPress={() => fetchGenerateRandomOutfit(closetSelected, false)}
                                     >
                                         <Text style={{ color: "white", fontSize: 18 }}>Generate Outfit</Text>
                                     </TouchableOpacity>
@@ -215,6 +302,10 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         backgroundColor: "#222",
         borderRadius: 10,
+        bottom: 5,
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center"
     },
     garmentContainer: {
         aspectRatio: 1,

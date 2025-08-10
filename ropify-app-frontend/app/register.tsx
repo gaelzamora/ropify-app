@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import Toast from "react-native-toast-message";
 
 const Register: React.FC = () => {
     const router = useRouter();
@@ -16,8 +17,16 @@ const Register: React.FC = () => {
     const [repassword, setRePassword] = useState("")
 
     async function onAuthenticate() {
-        if (password === repassword) await authenticate("register", email, password, username, firstName, lastName)
-        else Alert.alert("The passwod must be same password")
+        if (password === repassword) {
+            await authenticate("register", email, password, username, firstName, lastName)
+        } 
+        else Toast.show({
+            type: "error",
+            text1: "Error",
+            text2: "The passwords must be same"
+        })
+
+
     }
 
     return (

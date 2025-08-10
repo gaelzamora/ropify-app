@@ -23,13 +23,13 @@ func (s *AuthService) Login(ctx context.Context, loginData *models.AuthCredentia
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", nil, fmt.Errorf("invalid credentials")
+			return "", nil, fmt.Errorf("Invalid credentials")
 		}
 		return "", nil, err
 	}
 
 	if !models.MatchesHash(loginData.Password, user.Password) {
-		return "", nil, fmt.Errorf("invalid credentials")
+		return "", nil, fmt.Errorf("Invalid credentials")
 	}
 
 	claims := jwt.MapClaims{
@@ -48,11 +48,11 @@ func (s *AuthService) Login(ctx context.Context, loginData *models.AuthCredentia
 
 func (s *AuthService) Register(ctx context.Context, registerData *models.AuthCredentials) (string, *models.User, error) {
 	if !models.IsValidEmail(registerData.Email) {
-		return "", nil, fmt.Errorf("please, provide a valid email to register")
+		return "", nil, fmt.Errorf("Please, provide a valid email to register")
 	}
 
 	if _, err := s.repository.GetUser(ctx, "email = ?", registerData.Email); !errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", nil, fmt.Errorf("the user email is already in use")
+		return "", nil, fmt.Errorf("The user email is already in use")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(registerData.Password), bcrypt.DefaultCost)
