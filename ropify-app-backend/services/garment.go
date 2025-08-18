@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"os"
 	"strings"
 	"time"
@@ -47,12 +48,16 @@ type Point struct {
 }
 
 func RemoveBackground(imageBytes []byte) ([]byte, error) {
-	url := "http://background-removal-service:8000/remove-background"
+	url := "http://background-removal-service:8000/remove-bg"
 
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	part, err := writer.CreateFormFile("file", "garment.png")
+	h := make(textproto.MIMEHeader)
+    h.Set("Content-Disposition", `form-data; name="file"; filename="garment.png"`)
+    h.Set("Content-Type", "image/png")
+
+	part, err := writer.CreatePart(h)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create form file: %v", err)
 	}
